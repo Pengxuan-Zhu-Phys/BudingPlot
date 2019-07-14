@@ -41,10 +41,10 @@ class Figure():
     def plot(self):
         self.load_data()
         self.figures_inf()
+        self.Analytic_funcs()
         for fig in self.figs:
             self.drawpicture(fig)
-            # print(fig)
-        # print(self.figs)
+
 
     def drawpicture(self, fig):
         fig['fig'] = plt.figure(figsize=(10, 8))
@@ -52,6 +52,49 @@ class Figure():
             ax = fig['fig'].add_axes([0.16, 0.16, 0.68, 0.81])
             axc = fig['fig'].add_axes([0.845, 0.16, 0.02, 0.81])
             self.basic_selection(fig)
+            self.GetStatData(fig)
+            fig['var']['BestPoint'] = {
+                'x': fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].x,
+                'y': fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].y,
+                'Stat': fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].Stat
+            }
+            print(fig['var']['data'])
+            print(fig['var']['BestPoint'])
+            # fig['var']['data'].assign({'PL': fig['var']['data'].'Stat' })
+
+
+    def GetStatData(self, fig):
+        if self.cf.has_option(fig['section'], 'stat_variable'):
+            fig['var'] = {}
+            if self.cf.get(fig['section'], 'stat_variable').split(',')[0] == 'CHI2':
+                self.get_variable_data(fig, 'x', self.cf.get(fig['section'], 'x_variable'))
+                self.get_variable_data(fig, 'y', self.cf.get(fig['section'], 'y_variable'))
+                self.get_variable_data(fig, 'Stat', ",".join(self.cf.get(fig['section'], 'stat_variable').split(',')[1:]).strip())
+                fig['var']['data'] = pd.DataFrame({
+                    'x': fig['var']['x'], 
+                    'y': fig['var']['y'], 
+                    'Stat': fig['var']['Stat']})
+                fig['var'].pop('x')
+                fig['var'].pop('y')
+                fig['var'].pop('Stat')
+
+
+    def get_variable_data(self, fig, name, varinf):
+        if varinf[0:3] == '&Eq':
+            varinf = varinf[4:]
+            x_sel = self.var_symbol(varinf)
+            for x in x_sel:
+                varinf = varinf.replace("_{}".format(x), "fig['data']['{}']".format(x))
+            if "&FC_" in varinf:
+                for ii in range(len(self.funcs)):
+                    varinf = varinf.replace(self.funcs[ii]['name'], "self.funcs[{}]['expr']".format(ii))
+            fig['var'][name] = eval(varinf)
+        elif varinf in fig['data'].columns.values:
+            fig['var'][name] = fig['data'][name]
+        else:
+            print("No Variable {} found in Data!".format(varinf))
+            sys.exit(0)
+
 
     def figures_inf(self):
         if self.cf.has_option('PLOT_CONFI', 'plot'):
@@ -78,9 +121,20 @@ class Figure():
                                 'type':     pic['type']
                                 })
 
-    def bool_symbol(self, bo):
+    def Analytic_funcs(self):
+        self.funcs = []
+        for item in self.cf.sections():
+            if "FUNCTION1D" in item:
+                fun = {}
+                fun['name'] = "&FC_{}".format(self.cf.get(item, 'name'))
+                fun['data'] = np.loadtxt(self.cf.get(item, 'file'))
+                fun['expr'] = interp1d(fun['data'][:, 0], fun['data'][:, 1])
+                self.funcs.append(fun)
+        self.funcs = tuple(self.funcs)
+
+    def var_symbol(self, bo):
         x = []
-        bo = bo[4:].split()
+        bo = bo.split()
         for it in bo:
             if it[0] == '_' and it not in x:
                 x.append(it[1:])
@@ -90,12 +144,14 @@ class Figure():
         if self.cf.has_option(fig['section'], 'selection'):
             bo = self.cf.get(fig['section'], 'selection')
             if bo[0:3] == '&Bo':
-                x_sel = self.bool_symbol(bo)
                 bo = bo[4:]
+                x_sel = self.var_symbol(bo)
                 for x in x_sel:
                     bo = bo.replace("_{}".format(x), "self.data['{}']".format(x))
-                fig['data'] = self.data[eval(bo)]
-                print(fig['data'])
+            if "&FC_" in bo:
+                for ii in range(len(self.funcs)):
+                    bo = bo.replace(self.funcs[ii]['name'], "self.funcs[{}]['expr']".format(ii))
+            fig['data'] = self.data[eval(bo)].reset_index()
 
 
 

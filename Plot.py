@@ -26,6 +26,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         if sys.argv[1] == 'init':
             init()
-    else:
-        fig = Figure()
-        fig.get_inf("{}/{}".format(pwd, sys.argv[1]))
+        else:
+            fig = Figure()
+            fig.get_inf("{}/{}".format(pwd, sys.argv[1]))
+            fig.plot()

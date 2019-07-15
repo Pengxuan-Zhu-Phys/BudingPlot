@@ -61,6 +61,7 @@ class Figure():
         self.load_colorset()
         for fig in self.figs:
             self.drawpicture(fig)
+        
 
     # Plot Method is write in the drawpicture :
     # Add " elif fig['type'] == $FIGURE_TYPE$: "
@@ -122,8 +123,8 @@ class Figure():
             from matplotlib.tri import Triangulation, TriAnalyzer, UniformTriRefiner
             fig['ax']['tri'] = Triangulation(fig['ax']['grid']['xi'], fig['ax']['grid']['yi'])
             fig['ax']['refiner'] = UniformTriRefiner(fig['ax']['tri'])
-            fig['ax']['tri_refine_PL'], fig['ax']['PL_refine']          = fig['ax']['refiner'].refine_field(fig['ax']['grid']['PL'])
-            fig['ax']['tri_refine_DC'], fig['ax']['DeltaChi2_refine']   = fig['ax']['refiner'].refine_field(fig['ax']['grid']['DeltaChi2'])
+            fig['ax']['tri_refine_PL'], fig['ax']['PL_refine']          = fig['ax']['refiner'].refine_field(fig['ax']['grid']['PL'], subdiv=3)
+            fig['ax']['tri_refine_DC'], fig['ax']['DeltaChi2_refine']   = fig['ax']['refiner'].refine_field(fig['ax']['grid']['DeltaChi2'], subdiv=3)
             fig['ax']['PL_refine'] = ( fig['ax']['PL_refine'] > 0.) * fig['ax']['PL_refine'] / (np.max(fig['ax']['PL_refine'])) + 0. * ( fig['ax']['PL_refine'] > 0.)
             print("\tTimer: {:.2f} Second;  Message from '{}' -> Data analysis completed".format(time.time()-fig['start'], fig['section']))
 
@@ -151,7 +152,7 @@ class Figure():
                     ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color='w', zorder=21)
             if 'save' in self.cf.get(fig['section'], 'print_mode'):
                 fig['fig'] = plt
-                fig['fig'].savefig("{}/{}.pdf".format(self.figpath, fig['name']))
+                fig['fig'].savefig("{}/{}.pdf".format(self.figpath, fig['name']), dpi=300, bbox_inches='tight')
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()

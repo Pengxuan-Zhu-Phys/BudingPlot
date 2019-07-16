@@ -84,7 +84,6 @@ class Figure():
             # Two Method to achieve Profile Likelihood Data in Pandas! Lambda expr is more compact in code
             # fig['var']['data'] = fig['var']['data'].assign( PL=np.exp( -0.5 * fig['var']['data'].Stat )/np.exp(-0.5 * fig['var']['BestPoint']['Stat'])  )
             fig['var']['data'] = fig['var']['data'].assign( PL=lambda x: np.exp( -0.5 * x.Stat )/np.exp(-0.5 * fig['var']['BestPoint']['Stat'])  )
-            fig['var']['data'] = fig['var']['data'].assign( Delta_Chi2 = fig['var']['data'].Stat - fig['var']['BestPoint']['Stat'] )
             fig['var']['lim'] = {
                 'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
                 'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
@@ -108,9 +107,8 @@ class Figure():
             fig['ax']['grid'] = pd.DataFrame({
                 "xi":   fig['ax']['grid']['xx'],
                 'yi':   fig['ax']['grid']['yy'],
-                'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1),
-                'DeltaChi2': fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].Delta_Chi2.min(axis=0, skipna=True), axis=1)
-            }).fillna({'PL': 0., "DeltaChi2": 18.6})
+                'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
+            }).fillna({'PL': 0.})
             XI, YI = np.meshgrid(
                 np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1),
                 np.linspace(0, 1, int(self.cf.get(fig['section'], 'y_nbin'))+1)                
@@ -125,8 +123,7 @@ class Figure():
             fig['ax']['tri'] = Triangulation(fig['ax']['grid']['xi'], fig['ax']['grid']['yi'])
             fig['ax']['refiner'] = UniformTriRefiner(fig['ax']['tri'])
             fig['ax']['tri_refine_PL'], fig['ax']['PL_refine']          = fig['ax']['refiner'].refine_field(fig['ax']['grid']['PL'], subdiv=3)
-            fig['ax']['tri_refine_DC'], fig['ax']['DeltaChi2_refine']   = fig['ax']['refiner'].refine_field(fig['ax']['grid']['DeltaChi2'], subdiv=3)
-            fig['ax']['PL_refine'] = ( fig['ax']['PL_refine'] > 0.) * fig['ax']['PL_refine'] / (np.max(fig['ax']['PL_refine'])) + 0. * ( fig['ax']['PL_refine'] > 0.)
+            fig['ax']['PL_refine'] = ( fig['ax']['PL_refine'] > 0.) * fig['ax']['PL_refine'] / (np.max(fig['ax']['PL_refine'])) + 0. * ( fig['ax']['PL_refine'] < 0.)
             print("\tTimer: {:.2f} Second;  Message from '{}' -> Data analysis completed".format(time.time()-fig['start'], fig['section']))
 
             levels = MaxNLocator(nbins=50).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
@@ -137,8 +134,7 @@ class Figure():
             if self.cf.has_option(fig['section'], 'sign_curve'):
                 fig['ax']['curve'] = eval(self.cf.get(fig['section'], 'sign_curve'))
                 for curve in fig['ax']['curve']:
-                    ct = ax.tricontour(fig['ax']['tri_refine_DC'], fig['ax']['DeltaChi2_refine'], [curve[0]], colors=curve[3], linewidths=curve[4])
-                    # plt.clabel(ct, inline=True, fmt=r"{}".format(curve[2].replace('\\sigma', '\sigma') ), fontsize=8*curve[4], inline_spacing=2, use_clabeltext=True)
+                    ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve[0])], colors=curve[3], linewidths=curve[4], zorder=(5-curve[1])*4)
 
             ax.set_xticks(fig['ax']['ticks']['x'])
             ax.set_yticks(fig['ax']['ticks']['y'])
@@ -158,8 +154,8 @@ class Figure():
 
             if self.cf.has_option(fig['section'], 'BestPoint'):
                 if eval(self.cf.get(fig['section'], 'BestPoint')):
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color='Magenta', zorder=20)
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color='w', zorder=21)
+                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color='Magenta', zorder=2000)
+                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color='w', zorder=2100)
             if 'save' in self.cf.get(fig['section'], 'print_mode'):
                 from matplotlib.backends.backend_pdf import PdfPages
                 fig['fig'] = plt

@@ -2,6 +2,14 @@
 
 ## Version Info
 
+## V2.0.2
+
+Main Changes:
+
+1.) fix bugs for $1\sigma$, $2\sigma$ C.L. contour.
+
+2.) improve about 40%-50% performance, make the "2D_Stat_Profile" method figure plotting more quickly !
+
 ### V2.0.1
 
 Main Changes:

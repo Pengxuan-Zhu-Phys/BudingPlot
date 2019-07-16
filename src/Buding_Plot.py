@@ -22,6 +22,8 @@ from scipy.interpolate import Rbf
 import math
 import configparser
 import time
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
+                               AutoMinorLocator)
 
 class Figure():
     def __init__(self):
@@ -61,7 +63,6 @@ class Figure():
         self.load_colorset()
         for fig in self.figs:
             self.drawpicture(fig)
-        
 
     # Plot Method is write in the drawpicture :
     # Add " elif fig['type'] == $FIGURE_TYPE$: "
@@ -139,23 +140,38 @@ class Figure():
                     ct = ax.tricontour(fig['ax']['tri_refine_DC'], fig['ax']['DeltaChi2_refine'], [curve[0]], colors=curve[3], linewidths=curve[4])
                     # plt.clabel(ct, inline=True, fmt=r"{}".format(curve[2].replace('\\sigma', '\sigma') ), fontsize=8*curve[4], inline_spacing=2, use_clabeltext=True)
 
+            ax.set_xticks(fig['ax']['ticks']['x'])
+            ax.set_yticks(fig['ax']['ticks']['y'])
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
-            ax.tick_params(labelsize=20, direction='in', bottom=True, left=True, top=True, right=True, which='both', color='w')
-            axc.tick_params(labelsize=20, direction='in', bottom=True, left=False, top=True, right=False, which='both', color='w')
+
+            ax.xaxis.set_minor_locator(AutoMinorLocator())
+            ax.yaxis.set_minor_locator(AutoMinorLocator())
+            ax.tick_params(labelsize=20, direction='in', bottom=True, left=True, top=True, right=True, color='w', which='both')
+            ax.tick_params(which='major', length=7)
+            ax.tick_params(which='minor', length=4.5)
+            axc.tick_params(labelsize=20, direction='in', bottom=True, left=False, top=True, right=False, color='w')
             ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
             ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
             axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
+            ax.xaxis.set_label_coords(0.5, -0.068)
+
             if self.cf.has_option(fig['section'], 'BestPoint'):
                 if eval(self.cf.get(fig['section'], 'BestPoint')):
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color='Tomato', zorder=20)
+                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color='Magenta', zorder=20)
                     ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color='w', zorder=21)
             if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                from matplotlib.backends.backend_pdf import PdfPages
                 fig['fig'] = plt
-                fig['fig'].savefig("{}/{}.pdf".format(self.figpath, fig['name']), dpi=300, bbox_inches='tight')
+                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
+                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf', bbox_inches='tight')
+                self.compress_figure_to_PS(fig['file'])
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
+
+    def compress_figure_to_PS(self, figpath):
+        os.system('pdf2ps {}.pdf {}.ps'.format(figpath, figpath))
 
 
     def ax_setcmap(self, fig):
@@ -204,7 +220,9 @@ class Figure():
                 for ii in range(len(tick)):
                     tick[ii] = float(tick[ii].strip())
                 fig['ax']['ticks'][aa] = np.linspace(tick[0], tick[1], tick[2])
-
+            if aa == 'y':
+                if fig['ax']['lim']['y'][0] in fig['ax']['ticks']['y']:
+                    fig['ax']['ticks']['y'] = fig['ax']['ticks']['y'][np.where(fig['ax']['ticks']['y'] != fig['ax']['lim']['y'][0])]
 
 
     def GetStatData(self, fig):
@@ -250,7 +268,7 @@ class Figure():
             for line in ppt:
                 pic = {}
                 pic['type'] = line.split(',')[0]
-                if "ALL" in ','.join(line.split(',')[1:]):
+                if "ALL" in ','.join(line.split(',')[1:]).upper():
                     for item in self.cf.sections():
                         if pic['type'] in item:
                             self.figs.append({

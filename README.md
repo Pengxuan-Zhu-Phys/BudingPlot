@@ -1,3 +1,5 @@
+
+
 # BudingPlot
 
 ## Version Info
@@ -22,11 +24,9 @@ Main Changes:
 
 ## Download
 
-![1563320588241](C:\Users\zhupe\AppData\Roaming\Typora\typora-user-images\1563320588241.png)
+![](C:\Users\zhupe\git\BudingPlot\src\image-src\1563320588241.png)
 
- 
-
-![1563320687731](C:\Users\zhupe\AppData\Roaming\Typora\typora-user-images\1563320687731.png)
+![](C:\Users\zhupe\git\BudingPlot\src\image-src\1563320687731.png)
 
 ## Usage
 

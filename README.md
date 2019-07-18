@@ -28,10 +28,6 @@ Main Changes:
 
 ![choose zip](https://github.com/Buding820/BudingPlot/blob/master/src/image-src/1563320687731.png)
 
-
-
-
-
 ## Usage
 
 For first run, use command 

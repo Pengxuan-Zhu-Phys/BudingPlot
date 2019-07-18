@@ -24,9 +24,9 @@ Main Changes:
 
 ## Download
 
-![](C:\Users\zhupe\git\BudingPlot\src\image-src\1563320588241.png)
+![](https://github.com/Buding820/BudingPlot/src/image-src/1563320588241.png)
 
-![](C:\Users\zhupe\git\BudingPlot\src\image-src\1563320687731.png)
+![](https://github.com/Buding820/BudingPlot/src/image-src/1563320687731.png)
 
 ## Usage
 

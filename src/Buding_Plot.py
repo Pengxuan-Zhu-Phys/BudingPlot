@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os, sys
+import json
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
@@ -24,6 +25,8 @@ import configparser
 import time
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
+
+pwd = os.path.abspath(os.path.dirname(__file__))
 
 class Figure():
     def __init__(self):
@@ -55,6 +58,16 @@ class Figure():
                 else:
                     cset['cmap'] = cs.split('|')[1].strip()
                 self.colors[self.colors.index(cs)] = cset
+        elif self.cf.has_option("COLORMAP", 'colorsetting'):
+            with open("{}/{}".format(pwd, self.cf.get('COLORMAP', 'colorsetting')), 'r', encoding='utf-8') as f1:
+                # self.colors = json.load(f1)
+                self.colors = eval(f1.read())
+            for ii in range(len(self.colors)):
+                if isinstance(self.colors[ii]['colormap'], str):
+                    self.colors[ii]['colormap'] = plt.get_cmap(self.colors[ii]['colormap'])
+                else:
+                    from matplotlib.colors import LinearSegmentedColormap
+                    self.colors[ii]['colormap'] = LinearSegmentedColormap.from_list(self.colors[ii]['name'], tuple(self.colors[ii]['colormap']), N=255)
 
     def plot(self):
         self.load_data()
@@ -68,11 +81,13 @@ class Figure():
     # Add " elif fig['type'] == $FIGURE_TYPE$: "
     def drawpicture(self, fig):
         fig['fig'] = plt.figure(figsize=(10, 8))
+        fig['fig'].text(0., 0., "Test", color="None")
+        fig['fig'].text(1., 1., "Test", color="None")
         if fig['type'] == "2D_Stat_Profile":
             print("\n=== Ploting Figure : {} ===".format(fig['name']))
             fig['start'] = time.time()
-            ax = fig['fig'].add_axes([0.16, 0.16, 0.68, 0.81])
-            axc = fig['fig'].add_axes([0.845, 0.16, 0.015, 0.81])
+            ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
+            axc = fig['fig'].add_axes([0.875, 0.13, 0.015, 0.83])
             self.basic_selection(fig)
             print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
             self.GetStatData(fig)
@@ -128,13 +143,18 @@ class Figure():
 
             levels = MaxNLocator(nbins=50).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
             self.ax_setcmap(fig)
-
-            a1 = ax.tricontourf(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], cmap=fig['cmap'], levels=levels, zorder=1)
+            a1 = ax.tricontourf(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], cmap=fig['colorset']['colormap'], levels=levels, zorder=1)
             plt.colorbar(a1, axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
-            if self.cf.has_option(fig['section'], 'sign_curve'):
-                fig['ax']['curve'] = eval(self.cf.get(fig['section'], 'sign_curve'))
-                for curve in fig['ax']['curve']:
-                    ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve[0])], colors=curve[3], linewidths=curve[4], zorder=(5-curve[1])*4)
+
+            if 'curve' in fig['colorset'].keys():
+                for curve in fig['colorset']['curve']:
+                    ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve['value'])], colors=curve['linecolor'], linewidths=curve['linewidth'], zorder=(10-curve['tag'])*4)
+
+            if self.cf.has_option(fig['section'], 'BestPoint'):
+                if eval(self.cf.get(fig['section'], 'BestPoint')) and 'bestpoint' in fig['colorset'].keys():
+                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color=fig['colorset']['bestpoint'][0], zorder=2000)
+                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color=fig['colorset']['bestpoint'][1], zorder=2100)
+
 
             ax.set_xticks(fig['ax']['ticks']['x'])
             ax.set_yticks(fig['ax']['ticks']['y'])
@@ -143,24 +163,36 @@ class Figure():
 
             ax.xaxis.set_minor_locator(AutoMinorLocator())
             ax.yaxis.set_minor_locator(AutoMinorLocator())
-            ax.tick_params(labelsize=20, direction='in', bottom=True, left=True, top=True, right=True, color='w', which='both')
-            ax.tick_params(which='major', length=7)
-            ax.tick_params(which='minor', length=4.5)
-            axc.tick_params(labelsize=20, direction='in', bottom=True, left=False, top=True, right=False, color='w')
+            ax.tick_params(
+                labelsize=fig['colorset']['ticks']['labelsize'], 
+                direction=fig['colorset']['ticks']['direction'], 
+                bottom=fig['colorset']['ticks']['bottom'], 
+                left=fig['colorset']['ticks']['left'], 
+                top=fig['colorset']['ticks']['top'], 
+                right=fig['colorset']['ticks']['right'],
+                which='both'
+            )
+            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+            axc.tick_params(
+                labelsize=fig['colorset']['colorticks']['labelsize'], 
+                direction=fig['colorset']['colorticks']['direction'], 
+                bottom=fig['colorset']['colorticks']['bottom'], 
+                left=fig['colorset']['colorticks']['left'], 
+                top=fig['colorset']['colorticks']['top'], 
+                right=fig['colorset']['colorticks']['right'], 
+                color=fig['colorset']['colorticks']['color']
+            )
             ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
             ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
             axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
             ax.xaxis.set_label_coords(0.5, -0.068)
 
-            if self.cf.has_option(fig['section'], 'BestPoint'):
-                if eval(self.cf.get(fig['section'], 'BestPoint')):
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color='Magenta', zorder=2000)
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color='w', zorder=2100)
             if 'save' in self.cf.get(fig['section'], 'print_mode'):
                 from matplotlib.backends.backend_pdf import PdfPages
                 fig['fig'] = plt
                 fig['file'] = "{}/{}".format(self.figpath, fig['name'])
-                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf', bbox_inches='tight')
+                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
                 self.compress_figure_to_PS(fig['file'])
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
@@ -171,15 +203,13 @@ class Figure():
 
 
     def ax_setcmap(self, fig):
-        if self.cf.has_option(fig['section'], 'c_cmap'):
-            fig['cmap'] = self.cf.get(fig['section'], 'c_cmap')
-            if '&' == fig['cmap'][0]:
-                for cs in self.colors:
-                    if cs['name'] == fig['cmap'][1:]:
-                        fig['cmap'] = cs['cmap']
+        if self.cf.has_option(fig['section'], 'colorset'):
+            cname = self.cf.get(fig['section'], 'colorset')
+            if cname[0] == '&':
+                for ii in self.colors:
+                    if cname[1:] == ii['name']:
+                        fig['colorset'] = ii 
                         break
-            else:
-                fig['cmap'] = plt.get_cmap(fig['cmap'])
 
     def ax_setlim(self, fig, label):
         fig['ax']['lim'] = {}
@@ -255,7 +285,7 @@ class Figure():
 
 
     def figures_inf(self):
-        self.figpath = "{}{}".format(self.cf.get('PLOT_CONFI', 'path'), self.cf.get('PLOT_INFO', 'save_dir'))
+        self.figpath = "{}{}".format(self.cf.get('PLOT_CONFI', 'path'), self.cf.get('PLOT_CONFI', 'save_dir'))
         if not os.path.exists(self.figpath):
             os.makedirs(self.figpath)
         if self.cf.has_option('PLOT_CONFI', 'plot'):

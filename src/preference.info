@@ -1,0 +1,74 @@
+[
+    {
+        "name": "Gambit",
+        "colormap": [
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0,
+                1.0
+            ],
+            [
+                0.37109375,
+                0.99609375,
+                0.625
+            ],
+            [
+                0.99609375,
+                0.99609375,
+                0.0
+            ]
+        ],
+        "bestpoint": [
+            "Magenta",
+            "w"
+        ],
+        "curve": [
+            {
+                "value": 2.3,
+                "tag": 1,
+                "label": r"$1\sigma~{\rm C.L.~region}$",
+                "linecolor": "w",
+                "linewidth": 2
+            },
+            {
+                "value": 6.18,
+                "tag": 2,
+                "label": r"$2\sigma~{\rm C.L.~region}$",
+                "linecolor": "HotPink",
+                "linewidth": 1
+            }
+        ],
+        "ticks": {
+            "bottom":   True,
+            "left":     True,
+            "right":    True,
+            "top":      True,
+            "labelsize":    20,
+            "direction":    "in",
+            "majorlength":  7,
+            "minorlength":  4.5,        
+            "majorcolor":   'w',
+            "minorcolor":   'w'
+        },
+        "colorticks":   {
+            "labelsize":    20,
+            "direction":    'in',
+            "bottom":   False,
+            "top":      False,
+            "left":     False,
+            "right":    False,
+            "color":    'w'
+        }
+
+    }
+]

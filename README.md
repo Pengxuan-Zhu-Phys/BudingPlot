@@ -26,7 +26,7 @@ Main Changes:
 
 ![download](https://github.com/Buding820/BudingPlot/blob/master/src/image-src/1563320588241.png)
 
-![choose zip](https://github.com/Buding820/BudingPlot/blob/master/src/image-src/1563320687731.png)
+![choosezip](https://github.com/Buding820/BudingPlot/blob/master/src/image-src/1563320687731.png)
 
 ## Usage
 

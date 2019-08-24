@@ -214,7 +214,7 @@ class Figure():
     def ax_setlim(self, fig, label):
         fig['ax']['lim'] = {}
         for aa in label:
-            tem = self.cf.get(fig['section'], f'{aa}_lim').split(',')
+            tem = self.cf.get(fig['section'], '{}_lim'.format(aa)).split(',')
             fig['ax']['lim'][aa] = tem
             for it in tem:
                 if ('AUTO' in it) and (aa in fig['var']['lim'].keys()):
@@ -225,7 +225,7 @@ class Figure():
     def ax_setticks(self, fig, axislabel):
         fig['ax']['ticks'] = {}
         for aa in axislabel:
-            tick = self.cf.get(fig['section'], f'{aa}_ticks')
+            tick = self.cf.get(fig['section'], '{}_ticks'.format(aa))
             if 'AUTO' in tick:
                 a = float(tick.split('_')[-1])
                 low = fig['ax']['lim'][aa][0] //a

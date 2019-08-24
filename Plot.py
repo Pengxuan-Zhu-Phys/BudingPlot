@@ -19,7 +19,6 @@ def init():
         json.dump(package, f1)
 pwd = os.path.abspath(os.path.dirname(__file__))
 sys.path.append("{}/src/".format(pwd))
-from Buding_Plot import Figure
 
 
 if __name__ == "__main__":
@@ -27,6 +26,11 @@ if __name__ == "__main__":
         if sys.argv[1] == 'init':
             init()
         else:
+            from Buding_Plot import Figure
             fig = Figure()
             fig.get_inf("{}/{}".format(pwd, sys.argv[1]))
             fig.plot()
+
+
+
+

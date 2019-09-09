@@ -23,9 +23,9 @@
                 0.625
             ],
             [
-                0.99609375,
-                0.99609375,
-                0.0
+                1,
+                0.9215686,
+                0.231372
             ]
         ],
         "bestpoint": [
@@ -70,5 +70,107 @@
             "color":    'w'
         }
 
+    },
+    {
+        "name": "Default_Scatter",
+        "colormap": [
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0,
+                1.0
+            ],
+            [
+                0.37109375,
+                0.99609375,
+                0.625
+            ],
+            [
+                0.99609375,
+                0.99609375,
+                0.0
+            ]
+        ],
+        "scattercolor":{
+            "Red":          '#f44336',
+            "Pink":         '#e91e63',
+            "Purple":       '#9c27b0',
+            "DeepPurple":   '#673ab7',
+            "Indigo":       '#3f51b5',
+            "Blue":         '#2196f3',
+            "LightBlue":    '#03a9f4',
+            "Cyan":         '#00bcd4',
+            "Teal":         '#009688',
+            "Green":        '#4caf50',
+            "LightGreen":   '#8bc34a',
+            "Lime":         '#cddc39',
+            "Yellow":       '#ffeb3b',
+            "Amber":        '#ffc107',
+            "Orange":       '#ff9800',
+            "DeepOrange":   '#ff5722',
+            "Brown":        '#795548',
+            "Grey":         '#9e9e9e',
+            "BlueGrey":     '#607d8b'
+        },
+        'scattermarker':{
+            "round":        'o',
+            "dot":          '.',
+            "triangle":     'v',
+            "star":         '*'
+        },
+        "marker":{
+            "size":     7,
+            'alpha':    0.8
+        },
+        "bestpoint": [
+            "Magenta",
+            "w"
+        ],
+        "curve": [
+            {
+                "value": 2.3,
+                "tag": 1,
+                "label": r"$1\sigma~{\rm C.L.~region}$",
+                "linecolor": "w",
+                "linewidth": 2
+            },
+            {
+                "value": 6.18,
+                "tag": 2,
+                "label": r"$2\sigma~{\rm C.L.~region}$",
+                "linecolor": "HotPink",
+                "linewidth": 1
+            }
+        ],
+        "ticks": {
+            "bottom":   True,
+            "left":     True,
+            "right":    True,
+            "top":      True,
+            "labelsize":    20,
+            "direction":    "in",
+            "majorlength":  7,
+            "minorlength":  4.5,        
+            "majorcolor":   'Black',
+            "minorcolor":   'Black'
+        },
+        "colorticks":   {
+            "labelsize":    20,
+            "direction":    'in',
+            "bottom":   False,
+            "top":      False,
+            "left":     False,
+            "right":    False,
+            "color":    'Black'
+        }
     }
 ]

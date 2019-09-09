@@ -4,17 +4,19 @@
 
 ## Version Info
 
+### V2.1.0
+
+1.) 	fix bugs
+
+2.) 	Support `2D_Scstter` Mode. 
+
+3.) 	Standard `*.csv` format Data file now is supported.  format `*.dat` is not supported. 
+
+4.) 	Standard Scatter figure format `Default_Scatter` now is online. 
+
 ### V2.0.3
 
 1.) fix bugs
-
-### V2.0.2
-
-Main Changes:
-
-1.) fix bugs for $1\sigma$, $2\sigma$ C.L. contour.
-
-2.) improve about 40%-50% performance, make the "2D_Stat_Profile" method figure plotting more quickly !
 
 ## Download
 

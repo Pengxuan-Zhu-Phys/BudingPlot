@@ -39,8 +39,8 @@ class Figure():
     def load_data(self):
         self.data = []
         for opt in self.cf.get("PLOT_CONFI", 'result_file').split('\n'):
-            dat = pd.read_csv("{}{}".format(self.cf.get('PLOT_CONFI', 'path'), opt.split()[1]), delimiter='\t')
-            dat = dat.drop(["Index"], axis=1)
+            dat = pd.read_csv("{}{}".format(self.cf.get('PLOT_CONFI', 'path'), opt.split()[1]))
+            # dat = dat.drop(["Index"], axis=1)
             self.data.append(dat)
         self.data = pd.concat(self.data, axis=0, join='outer', ignore_index=True)
 
@@ -197,6 +197,72 @@ class Figure():
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
+        elif fig['type'] == "2D_Scatter":
+            print("\n=== Ploting Figure : {} ===".format(fig['name']))
+            fig['start'] = time.time()
+            ax = fig['fig'].add_axes([0.13, 0.13, 0.83, 0.83])
+            self.basic_selection(fig)
+            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
+            self.Get2DData(fig)
+            # print(fig['var']['data'])
+            fig['var']['lim'] = {
+                'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
+                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
+            }
+            fig['ax'] = {}
+            self.ax_setlim(fig, 'xy')
+            self.ax_setcmap(fig)
+            # print(fig['colorset'])
+            if self.cf.has_option(fig['section'], 'marker'):
+                marker = self.cf.get(fig['section'], 'marker').split(',')
+                fig['ax']['markercolor'] = marker[0].strip()
+                fig['ax']['markertype'] = marker[1].strip()
+            else:
+                fig['ax']['markercolor'] = 'Blue'
+                fig['ax']['markertype'] = 'round'
+
+            ax.scatter(
+                    fig['var']['data'].x, 
+                    fig['var']['data'].y, 
+                    marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                    c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                    s=      fig['colorset']['marker']['size'],
+                    alpha=  fig['colorset']['marker']['alpha']
+                )
+            self.ax_setticks(fig, 'xy')
+
+            ax.set_xticks(fig['ax']['ticks']['x'])
+            ax.set_yticks(fig['ax']['ticks']['y'])
+            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+            ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
+            ax.xaxis.set_minor_locator(AutoMinorLocator())
+            ax.yaxis.set_minor_locator(AutoMinorLocator())
+            ax.tick_params(
+                labelsize=fig['colorset']['ticks']['labelsize'], 
+                direction=fig['colorset']['ticks']['direction'], 
+                bottom=fig['colorset']['ticks']['bottom'], 
+                left=fig['colorset']['ticks']['left'], 
+                top=fig['colorset']['ticks']['top'], 
+                right=fig['colorset']['ticks']['right'],
+                which='both'
+            )
+            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
+            ax.xaxis.set_label_coords(0.5, -0.068)
+            
+            if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                from matplotlib.backends.backend_pdf import PdfPages
+                fig['fig'] = plt
+                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
+                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
+                # self.compress_figure_to_PS(fig['file'])
+                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
+            if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                plt.show()
+
+        
 
     def compress_figure_to_PS(self, figpath):
         os.system('pdf2ps {}.pdf {}.ps'.format(figpath, figpath))
@@ -265,6 +331,15 @@ class Figure():
                 fig['var'].pop('x')
                 fig['var'].pop('y')
                 fig['var'].pop('Stat')
+
+    def Get2DData(self, fig):
+        fig['var'] = {}
+        self.get_variable_data(fig, 'x', self.cf.get(fig['section'], 'x_variable'))
+        self.get_variable_data(fig, 'y', self.cf.get(fig['section'], 'y_variable'))
+        fig['var']['data'] = pd.DataFrame({
+            'x':    fig['var']['x'],
+            'y':    fig['var']['y']
+        })
 
 
     def get_variable_data(self, fig, name, varinf):

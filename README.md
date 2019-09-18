@@ -12,7 +12,7 @@
 
 3.) 	Standard `*.csv` format Data file now is supported.  format `*.dat` is not supported. 
 
-4.) 	Standard Scatter figure format `Default_Scatter` now is online. 
+4.) 	Standard Scatter figure format `Default_Scatter` now is online. Color Setting of this format can be seen in file `src/preference.info` and the corresponding color can be seen in the `src/image-src/Default_Scatter_Format.png` . Any question please contact me first time!!!!
 
 ### V2.0.3
 

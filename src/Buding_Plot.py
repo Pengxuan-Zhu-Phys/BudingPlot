@@ -105,64 +105,145 @@ class Figure():
             }
             fig['ax'] = {}
             self.ax_setlim(fig, 'xyc')
+            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                XI, YI = np.meshgrid(
+                    np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                
+                )
+                fig['ax']['var'] = {
+                    'x':    XI,
+                    'y':    YI,
+                    'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
+                    'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
+                }
+                fig['ax']['grid'] = pd.DataFrame(
+                    index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                fig['ax']['grid'] = pd.DataFrame({
+                    "xi":   fig['ax']['grid']['xx'],
+                    'yi':   fig['ax']['grid']['yy'],
+                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
+                }).fillna({'PL': -0.1})
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                XI, YI = np.meshgrid(
+                    np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                     
+                )
+                fig['ax']['var'] = {
+                    'x':    XI,
+                    'y':    YI,
+                    'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin')),
+                    'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
+                }
+                fig['ax']['grid'] = pd.DataFrame(
+                    index=np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                fig['ax']['grid'] = pd.DataFrame({
+                    "xi":   fig['ax']['grid']['xx'],
+                    'yi':   fig['ax']['grid']['yy'],
+                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > 10**(math.log10(tt['xx']) - 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
+                }).fillna({'PL': -0.1})
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                XI, YI = np.meshgrid(
+                    np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)                                       
+                )    
+                fig['ax']['var'] = {
+                    'x':    XI,
+                    'y':    YI,
+                    'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
+                    'dy':   (math.log10(fig['ax']['lim']['y'][1]) - math.log10(fig['ax']['lim']['y'][0]))/int(self.cf.get(fig['section'], 'y_nbin'))
+                }
+                fig['ax']['grid'] = pd.DataFrame(
+                    index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    columns=np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log10(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                fig['ax']['grid'] = pd.DataFrame({
+                    "xi":   fig['ax']['grid']['xx'],
+                    'yi':   fig['ax']['grid']['yy'],
+                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > 10**(math.log10(tt['yy']) - 0.5*fig['ax']['var']['dy'])) & (fig['var']['data'].y <10**(math.log10(tt['yy']) + 0.5*fig['ax']['var']['dy'])) ].PL.max(axis=0, skipna=True), axis=1)
+                }).fillna({'PL': -0.1})
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                XI, YI = np.meshgrid(
+                    np.logspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    np.logspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                                       
+                )
+                fig['ax']['var'] = {
+                    'x':    XI,
+                    'y':    YI,
+                    'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin')),
+                    'dy':   (math.log10(fig['ax']['lim']['y'][1]) - math.log10(fig['ax']['lim']['y'][0]))/int(self.cf.get(fig['section'], 'y_nbin'))
+                }
+                fig['ax']['grid'] = pd.DataFrame(
+                    index=np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    columns=np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log10(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                fig['ax']['grid'] = pd.DataFrame({
+                    "xi":   fig['ax']['grid']['xx'],
+                    'yi':   fig['ax']['grid']['yy'],
+                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > 10**(math.log10(tt['xx']) - 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].y > 10**(math.log10(tt['yy']) - 0.5*fig['ax']['var']['dy'])) & (fig['var']['data'].y <10**(math.log10(tt['yy']) + 0.5*fig['ax']['var']['dy'])) ].PL.max(axis=0, skipna=True), axis=1)
+                }).fillna({'PL': -0.1})
+            else:
+                print("No such Mode For X,Y scale -> {},{}".format(self.cf.get(fig['section'], 'x_scale'), self.cf.get(fig['section'], 'y_scale')))
+                sys.exit(0)
             XI, YI = np.meshgrid(
-                np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                
+                np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1)                
             )
-            fig['ax']['var'] = {
-                'x':    XI,
-                'y':    YI,
-                'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
-                'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
-            }
-            fig['ax']['grid'] = pd.DataFrame(
-                index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
+            fig['ax']['mashgrid'] = pd.DataFrame(
+                index = np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                columns = np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1) 
             ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-            fig['ax']['grid'] = pd.DataFrame({
-                "xi":   fig['ax']['grid']['xx'],
-                'yi':   fig['ax']['grid']['yy'],
-                'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
-            }).fillna({'PL': 0.})
-            XI, YI = np.meshgrid(
-                np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                np.linspace(0, 1, int(self.cf.get(fig['section'], 'y_nbin'))+1)                
-            )
-            fig['ax']['mashgrid'] = {
-                'x': XI,
-                'y': YI
-            }
+            # print(fig['ax']['grid']['PL'])
+            fig['ax']['mashgrid'] = pd.DataFrame({
+                'x':  fig['ax']['mashgrid']['xx'],
+                'y':  fig['ax']['mashgrid']['yy'],
+                'PL':   fig['ax']['grid']['PL']
+            })
             self.ax_setticks(fig, 'xyc')
+            # print(fig['ax']['mashgrid'])
+
+            # print("++++++++Data Loding Finish")
             from matplotlib.ticker import MaxNLocator
+            levels = MaxNLocator(nbins=100).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
+            self.ax_setcmap(fig)
+            # if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
             from matplotlib.tri import Triangulation, TriAnalyzer, UniformTriRefiner
-            fig['ax']['tri'] = Triangulation(fig['ax']['grid']['xi'], fig['ax']['grid']['yi'])
+            fig['ax']['tri'] = Triangulation(fig['ax']['mashgrid']['x'], fig['ax']['mashgrid']['y'])
             fig['ax']['refiner'] = UniformTriRefiner(fig['ax']['tri'])
-            fig['ax']['tri_refine_PL'], fig['ax']['PL_refine']          = fig['ax']['refiner'].refine_field(fig['ax']['grid']['PL'], subdiv=3)
+            fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'] = fig['ax']['refiner'].refine_field(fig['ax']['mashgrid']['PL'], subdiv=3)
             fig['ax']['PL_refine'] = ( fig['ax']['PL_refine'] > 0.) * fig['ax']['PL_refine'] / (np.max(fig['ax']['PL_refine'])) + 0. * ( fig['ax']['PL_refine'] < 0.)
+
             print("\tTimer: {:.2f} Second;  Message from '{}' -> Data analysis completed".format(time.time()-fig['start'], fig['section']))
 
-            levels = MaxNLocator(nbins=50).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
-            self.ax_setcmap(fig)
-            a1 = ax.tricontourf(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], cmap=fig['colorset']['colormap'], levels=levels, zorder=1)
+            a1 = ax.tricontourf(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], cmap=fig['colorset']['colormap'], levels=levels, zorder=1, transform=ax.transAxes)
             plt.colorbar(a1, axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
-
             if 'curve' in fig['colorset'].keys():
                 for curve in fig['colorset']['curve']:
-                    ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve['value'])], colors=curve['linecolor'], linewidths=curve['linewidth'], zorder=(10-curve['tag'])*4)
+                    ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve['value'])], colors=curve['linecolor'], linewidths=curve['linewidth'], zorder=(10-curve['tag'])*4, transform=ax.transAxes)
+
+                
 
             if self.cf.has_option(fig['section'], 'BestPoint'):
                 if eval(self.cf.get(fig['section'], 'BestPoint')) and 'bestpoint' in fig['colorset'].keys():
                     ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color=fig['colorset']['bestpoint'][0], zorder=2000)
                     ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color=fig['colorset']['bestpoint'][1], zorder=2100)
-
-
-            ax.set_xticks(fig['ax']['ticks']['x'])
-            ax.set_yticks(fig['ax']['ticks']['y'])
+            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                ax.set_xticks(fig['ax']['ticks']['x'])
+                ax.xaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                ax.set_xscale('log')
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+
+            if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                ax.set_yticks(fig['ax']['ticks']['y'])
+                ax.yaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                ax.set_yscale('log')
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
 
-            ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.tick_params(
                 labelsize=fig['colorset']['ticks']['labelsize'], 
                 direction=fig['colorset']['ticks']['direction'], 
@@ -267,7 +348,6 @@ class Figure():
     def compress_figure_to_PS(self, figpath):
         os.system('pdf2ps {}.pdf {}.ps'.format(figpath, figpath))
 
-
     def ax_setcmap(self, fig):
         if self.cf.has_option(fig['section'], 'colorset'):
             cname = self.cf.get(fig['section'], 'colorset')
@@ -316,7 +396,6 @@ class Figure():
                 if fig['ax']['lim']['y'][0] in fig['ax']['ticks']['y']:
                     fig['ax']['ticks']['y'] = fig['ax']['ticks']['y'][np.where(fig['ax']['ticks']['y'] != fig['ax']['lim']['y'][0])]
 
-
     def GetStatData(self, fig):
         if self.cf.has_option(fig['section'], 'stat_variable'):
             fig['var'] = {}
@@ -341,7 +420,6 @@ class Figure():
             'y':    fig['var']['y']
         })
 
-
     def get_variable_data(self, fig, name, varinf):
         if varinf[0:3] == '&Eq':
             varinf = varinf[4:]
@@ -357,7 +435,6 @@ class Figure():
         else:
             print("No Variable {} found in Data!".format(varinf))
             sys.exit(0)
-
 
     def figures_inf(self):
         self.figpath = "{}{}".format(self.cf.get('PLOT_CONFI', 'path'), self.cf.get('PLOT_CONFI', 'save_dir'))

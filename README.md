@@ -16,6 +16,12 @@ Current Version Support:
 
 ## Version Info
 
+## V2.2.0
+
+1.)	Add Line Method and Text Method;
+
+2.)	Add Function method `FUNCTION1D` . 	
+
 ### V2.1.1
 
 1.) 	fix bugs for the $1\sigma$ or $2\sigma$ curves when using `2D_Stat_Profile` method.
@@ -31,10 +37,6 @@ Current Version Support:
 3.) 	Standard `*.csv` format Data file now is supported.  format `*.dat` is not supported. 
 
 4.) 	Standard Scatter figure format `Default_Scatter` now is online. Color Setting of this format can be seen in file `src/preference.info` and the corresponding color can be seen in the `src/image-src/Default_Scatter_Format.png` . Any question please contact me first time!!!!
-
-### V2.0.3
-
-1.) fix bugs
 
 ## Download
 

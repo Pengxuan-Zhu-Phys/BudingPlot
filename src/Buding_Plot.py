@@ -25,6 +25,7 @@ import configparser
 import time
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
+import re 
 
 pwd = os.path.abspath(os.path.dirname(__file__))
 
@@ -196,20 +197,16 @@ class Figure():
                 index = np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
                 columns = np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1) 
             ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-            # print(fig['ax']['grid']['PL'])
             fig['ax']['mashgrid'] = pd.DataFrame({
                 'x':  fig['ax']['mashgrid']['xx'],
                 'y':  fig['ax']['mashgrid']['yy'],
                 'PL':   fig['ax']['grid']['PL']
             })
             self.ax_setticks(fig, 'xyc')
-            # print(fig['ax']['mashgrid'])
 
-            # print("++++++++Data Loding Finish")
             from matplotlib.ticker import MaxNLocator
             levels = MaxNLocator(nbins=100).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
             self.ax_setcmap(fig)
-            # if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
             from matplotlib.tri import Triangulation, TriAnalyzer, UniformTriRefiner
             fig['ax']['tri'] = Triangulation(fig['ax']['mashgrid']['x'], fig['ax']['mashgrid']['y'])
             fig['ax']['refiner'] = UniformTriRefiner(fig['ax']['tri'])
@@ -268,6 +265,12 @@ class Figure():
             ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
             axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
             ax.xaxis.set_label_coords(0.5, -0.068)
+
+            if self.cf.has_option(fig['section'], 'Line_draw'):
+                self.drawline(fig, ax)
+            
+            if self.cf.has_option(fig['section'], "Text"):
+                self.drawtext(fig, ax)
 
             if 'save' in self.cf.get(fig['section'], 'print_mode'):
                 from matplotlib.backends.backend_pdf import PdfPages
@@ -343,7 +346,194 @@ class Figure():
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
 
+    def get_Linestyle(self, style):
+        style_file = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get("COLORMAP", "StyleSetting"))
+        style = style.strip()
+        if (not style[0] == '&') or (not os.path.exists(style_file)):
+            print("\tLine info Error: Unvaliable line format {} \n\t Default Line Format used".format(style))
+            return {'width':    2., 'color':    '#b71c1c', 'style':    '-', 'alpha':    1.0, 'marker':   None, 'markersize':   5}
+        else:
+            style = style.split('_')
+            style = {
+                'name':     style[0].replace("&", '').strip(),
+                'label':    style[1].strip()
+            }
+            with open(style_file, 'r') as f1:
+                default_style = json.load(f1)
+            style_tag = False
+            for n, v in default_style.items():
+                if style['name'] == n:
+                    for item in v:
+                        if style['label'] == item['label']:
+                            style = item['LineStyle']
+                            style_tag = True
+                            break
+            if style_tag:
+                return style
+            else:
+                print("\tLine info Error: Unvaliable line format {} \n\t Default Line Format used".format(style))
+                return {'width':    2., 'color':    '#b71c1c', 'style':    '-', 'alpha':    1.0, 'marker':   None, 'markersize':   5}
+
+    def drawline(self, fig, ax):
+        def get_variable(info):
+            info = info.replace('{', '').replace('}', '').strip()
+            info = info.split('|')
+            info = {
+                'varname':  info[0].strip(),
+                'vardata':  np.linspace(float(info[1].strip()), float(info[2].strip()), int(info[3].strip()))
+            }
+            return info
         
+        def get_data(expr, var):
+            for ii, fc in enumerate(self.funcs):
+                expr = expr.replace(fc['name'], "self.funcs[{}]['expr']".format(ii))
+            y = []
+            for ii in var['vardata']:
+                y.append(eval(expr.replace('_{}'.format(var['varname']), str(ii))))
+            return np.array(y)
+
+        def get_function(var, func):
+            var = get_variable(var)
+            decode = re.compile(r'[{](.*?)[}]', re.S)
+            func = re.findall(decode, func)
+            for ii, fc in enumerate(func):
+                line = fc.split(':')
+                func[ii] = {
+                    'varname':  line[0].strip(),
+                    'vardata':  get_data(line[1], var)
+                }
+            func.append(var)
+            return func 
+
+        def get_line_info(line):
+            info = line.split(',')
+            if info[0].strip() == 'parametric':
+                res = {}
+                res['method'] = info.pop(0)
+                res['var'] = info.pop(0)
+                res['style'] = self.get_Linestyle(info.pop(-1))
+                res['Func'] = ','.join(info)
+                res['var'] = get_function(res['var'], res['Func'])
+                xtag, ytag = False, False
+                for ii, var in enumerate(res['var']):
+                    if var['varname'] == 'x':
+                        xx = var['vardata']
+                        xtag = True
+                    if var['varname'] == 'y':
+                        yy = var['vardata']
+                        ytag = True
+                if xtag and ytag:
+                    res['data'] = pd.DataFrame({
+                        'x':  xx,
+                        'y':  yy
+                    })           
+                elif not xtag:
+                    print("\tLine Info Error: No x coordinate founded in Line Setting\n\t{}".format(line)) 
+                elif not ytag:
+                    print("\tLine Info Error: No y coordinate founded in Line Setting\n\t{}".format(line)) 
+                return res
+            elif info[0].strip() == "Equation":
+                res = {}
+                res['method'] = info.pop(0)
+                res['var'] = info.pop(0)
+                res['style'] = self.get_Linestyle(info.pop(-1))
+                res['Func'] = ','.join(info)
+                res['var'] = get_function(res['var'], res['Func'])
+                xtag, ytag = False, False
+                for ii, var in enumerate(res['var']):
+                    if var['varname'] == 'x':
+                        xx = var['vardata']
+                        xtag = True
+                    if var['varname'] == 'y':
+                        yy = var['vardata']
+                        ytag = True
+                if xtag and ytag:
+                    res['data'] = pd.DataFrame({
+                        'x':  xx,
+                        'y':  yy
+                    })           
+                elif not xtag:
+                    print("\tLine Info Error: No x coordinate founded in Line Setting\n\t{}".format(line)) 
+                elif not ytag:
+                    print("\tLine Info Error: No y coordinate founded in Line Setting\n\t{}".format(line)) 
+                return res
+            else:
+                print("Line Drawing Error: No such line function methed {}\n\t-> {}".format(info[0], line))
+                sys.exit(1)
+
+        def draw(lineinfo):
+            if lineinfo['style']['marker'] == 'None':
+                ax.plot(lineinfo['data']['x'], lineinfo['data']['y'], linewidth=lineinfo['style']['width'], color=lineinfo['style']['color'], linestyle=lineinfo['style']['style'], zorder=3000)
+
+        fig['lineinfo'] = self.cf.get(fig['section'], 'Line_draw').split('\n')
+        for ii, line in enumerate(fig['lineinfo']):
+            draw(get_line_info(line))
+
+    def get_TextStyle(self, style):
+        style_file = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get("COLORMAP", "StyleSetting"))
+        style = style.strip()
+        if style[0] != '&' and type(eval(style)) == dict:
+            style = eval(style)
+            kys = ['FontSize', 'color', 'alpha']
+            style_tag = True
+            for k in kys:
+                if 'FontSize' not in style.keys():
+                    style_tag = False
+            if style_tag:
+                return style
+            else:
+                print("\tLine info Error: Unvaliable Text format {} \n\t Default Line Text Format used".format(style))
+                return {"FontSize": 20, "color": "#b71c1c", "alpha": 1.0}
+        elif (not style[0] == '&') or (not os.path.exists(style_file)):
+            print("\tLine info Error: Unvaliable Text format {} \n\t Default Line Text Format used".format(style))
+            return {"FontSize": 20, "color": "#b71c1c", "alpha": 1.0}
+        else:
+            style = style.split('_')
+            style = {
+                'name':     style[0].replace("&", '').strip(),
+                'label':    style[1].strip()
+            }
+            with open(style_file, 'r') as f1:
+                default_style = json.load(f1)
+            style_tag = False
+            for n, v in default_style.items():
+                if style['name'] == n:
+                    for item in v:
+                        if style['label'] == item['label']:
+                            style = item['TextStyle']
+                            style_tag = True
+                            break
+            if style_tag:
+                return style
+            else:
+                print("\tLine info Error: Unvaliable Text format {} \n\t Default Line Text Format used".format(style))
+                return {"FontSize": 20, "color": "#b71c1c", "alpha": 1.0} 
+
+
+
+
+    def drawtext(self, fig, ax):
+        def get_text_info(line):
+            decode = re.compile(r'[(](.*?)[)]', re.S)
+            pos = re.findall(decode, line)[0]
+            line = line.replace('({})'.format(pos), '').strip()
+            pos = pos.split(',')
+            line = line.lstrip('|')
+            line = line.split('|')
+            res = {
+                'pos':      [float(pos[0].strip()), float(pos[1].strip())],
+                'rotation': float(line.pop(0).strip()),
+                'style':    self.get_TextStyle(line.pop(-1).strip()),
+                'text':     '|'.join(line).strip()
+            }
+            return res
+        
+        def draw(info):
+            ax.text(info['pos'][0], info['pos'][1], r"{}".format(info['text']), fontsize=info['style']['FontSize'], color=info['style']['color'], alpha=info['style']['alpha'], rotation=info['rotation'], horizontalalignment='left', verticalalignment='bottom', zorder=1999) 
+
+        fig['textinfo'] = self.cf.get(fig['section'], 'Text').split('\n')
+        for ii, line in enumerate(fig['textinfo']):
+            draw(get_text_info(line))
 
     def compress_figure_to_PS(self, figpath):
         os.system('pdf2ps {}.pdf {}.ps'.format(figpath, figpath))
@@ -470,8 +660,9 @@ class Figure():
             if "FUNCTION1D" in item:
                 fun = {}
                 fun['name'] = "&FC_{}".format(self.cf.get(item, 'name'))
-                fun['data'] = np.loadtxt(self.cf.get(item, 'file'))
-                fun['expr'] = interp1d(fun['data'][:, 0], fun['data'][:, 1])
+                data_dir = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get(item, 'file'))
+                fun['data'] = pd.read_csv(data_dir)
+                fun['expr'] = interp1d(fun['data']['x'], fun['data']['y'])
                 self.funcs.append(fun)
         self.funcs = tuple(self.funcs)
 

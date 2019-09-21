@@ -2,7 +2,25 @@
 
 # BudingPlot
 
+## Introduction 
+
+An easy to use plot tool. 
+
+`BudingPlot` using `.csv` format data, embedding 2D statistical method to show the `MultiNest` Data. 
+
+Current Version Support:
+
+​	1)	`2D_Stat_Profile` Method;
+
+​	2)	`2D_Scatter` Method; 
+
 ## Version Info
+
+### V2.1.1
+
+1.) 	fix bugs for the $1\sigma$ or $2\sigma$ curves when using `2D_Stat_Profile` method.
+
+2.)	Support `Log` scale for `2D_Stat_Profile` method. 
 
 ### V2.1.0
 

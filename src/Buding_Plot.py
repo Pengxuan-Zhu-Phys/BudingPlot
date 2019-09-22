@@ -227,6 +227,8 @@ class Figure():
                 if eval(self.cf.get(fig['section'], 'BestPoint')) and 'bestpoint' in fig['colorset'].keys():
                     ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color=fig['colorset']['bestpoint'][0], zorder=2000)
                     ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color=fig['colorset']['bestpoint'][1], zorder=2100)
+                    # print(fig['data'][fig['data']["chi2_h1"] == fig['var']['BestPoint']['Stat']])
+
             if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
                 ax.set_xticks(fig['ax']['ticks']['x'])
                 ax.xaxis.set_minor_locator(AutoMinorLocator())
@@ -685,6 +687,15 @@ class Figure():
             if "&FC_" in bo:
                 for ii in range(len(self.funcs)):
                     bo = bo.replace(self.funcs[ii]['name'], "self.funcs[{}]['expr']".format(ii))
+            print("Total Data Rows is -> {}".format(self.data.shape))
+            if "*Bool*" not in self.data.columns:
+                bool_list = np.ones(self.data.shape[0], dtype=np.bool)
+                self.data['*Bool*'] = bool_list
+                bo = bo + "and self.data['*Bool*']"
+            else:
+                bool_list = np.ones(self.data.shape[0], dtype=np.bool)
+                self.data['abc**cba**bool**loob**alphabeta'] = bool_list
+                bo = bo + "and self.data['abc**cba**bool**loob**alphabeta']"
             fig['data'] = self.data[eval(bo)].reset_index()
 
 

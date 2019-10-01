@@ -4,7 +4,7 @@ import os, sys
 import subprocess
 import json
 def init():
-    package = {'matplotlib': None, 'numpy': None, 'pandas': None, 'scipy': None, 'sympy': None}
+    package = {'matplotlib': None, 'numpy': None, 'pandas': None, 'scipy': None, 'sympy': None, 'python-ternary': None}
     out = subprocess.getoutput("pip3 freeze").split('\n')
     for ii in package.keys():
         de = False

@@ -1,1 +1,1 @@
-{"matplotlib": "3.0.3", "numpy": "1.16.4", "pandas": "0.24.2", "scipy": "1.3.0", "sympy": "1.4"}
+{"matplotlib": "3.1.1", "numpy": "1.17.3", "pandas": "0.24.2", "scipy": "1.3.0", "sympy": "1.4", "python-ternary": "1.0.6"}

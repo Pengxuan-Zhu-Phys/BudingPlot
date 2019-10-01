@@ -234,6 +234,9 @@ class Figure():
                 ax.xaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
                 ax.set_xscale('log')
+            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
 
             if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
@@ -241,6 +244,9 @@ class Figure():
                 ax.yaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
                 ax.set_yscale('log')
+            if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['y'][1])
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
 
             ax.tick_params(
@@ -293,7 +299,7 @@ class Figure():
             # print(fig['var']['data'])
             fig['var']['lim'] = {
                 'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
-                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
+                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()]
             }
             fig['ax'] = {}
             self.ax_setlim(fig, 'xy')
@@ -391,6 +397,154 @@ class Figure():
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
+        elif fig['type'] == "2DC_Scatter":
+            print("\n=== Ploting Figure : {} ===".format(fig['name']))
+            fig['start'] = time.time()
+            ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
+            axc = fig['fig'].add_axes([0.875, 0.13, 0.015, 0.83])
+            self.basic_selection(fig)
+            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
+            self.Get3DData(fig)
+            fig['var']['lim'] = {
+                'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
+                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
+                'c': [fig['var']['data'].c.min(), fig['var']['data'].c.max()]
+            }
+            fig['ax'] = {}
+            self.ax_setlim(fig, 'xyc')
+            self.ax_setcmap(fig)
+
+            fig['ax']['a1'] = []
+            if self.cf.has_option(fig['section'], 'marker'):
+                lines = self.cf.get(fig['section'], 'marker').split('\n')
+                for line in lines:
+                    marker = line.split(',')
+                    if marker[0].strip() == "&Color":
+                        fig['ax']['markertype'] = marker[1].strip()
+                        if len(marker) == 2:
+                            fig['ax']['a1'].append(ax.scatter(
+                                fig['var']['data'].x,
+                                fig['var']['data'].y,
+                                marker  = fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                c       = fig['var']['data'].c,
+                                cmap    = fig['colorset']['colormap'],
+                                vmin    = fig['ax']['lim']['c'][0],
+                                vmax    = fig['ax']['lim']['c'][1]
+                            ))
+                        elif len(marker) > 2:
+                            if marker[2].strip()[0:3] == '&Bo':
+                                self.scatter_classify_data(fig, marker[2].strip()[4:])
+                                fig['ax']['a1'].append(ax.scatter(
+                                    fig['classify']['x'],
+                                    fig['classify']['y'],
+                                    marker  = fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                    c       = fig['classify']['c'],
+                                    cmap    = fig['colorset']['colormap'],
+                                    vmin    = fig['ax']['lim']['c'][0],
+                                    vmax    = fig['ax']['lim']['c'][1]
+                                ))
+                    else:
+                        fig['ax']['markercolor']    = marker[0].strip()
+                        fig['ax']['markertype']     = marker[1].strip()
+                        if len(marker) == 2:
+                            ax.scatter(
+                                fig['var']['data'].x,
+                                fig['var']['data'].y,
+                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                s=      fig['colorset']['marker']['size'],
+                                alpha=  fig['colorset']['marker']['alpha']
+                            )
+                        elif len(marker) > 2:
+                            if marker[2].strip()[0:3] == '&Bo':
+                                self.scatter_classify_data(fig, marker[2].strip()[4:])
+                                ax.scatter(
+                                    fig['classify']['x'],
+                                    fig['classify']['y'],
+                                    marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                    c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                    s=      fig['colorset']['marker']['size'],
+                                    alpha=  fig['colorset']['marker']['alpha']
+                                )  
+
+            self.ax_setticks(fig, 'xyc')
+            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                ax.set_xticks(fig['ax']['ticks']['x'])
+                ax.xaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                ax.set_xscale('log')
+            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+
+            if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                ax.set_yticks(fig['ax']['ticks']['y'])
+                ax.yaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                ax.set_yscale('log')
+            if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['y'][1])
+            ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
+                        
+            
+            if self.cf.has_option(fig['section'], 'c_scale'):
+                if self.cf.get(fig['section'], 'c_scale').strip().lower() == 'log':
+                    from matplotlib.colors import LogNorm
+                    plt.colorbar(fig['ax']['a1'][0], axc, norm=LogNorm(fig['var']['lim']['c'][0], fig['var']['lim']['c'][1]), orientation='vertical', extend='neither')
+                elif self.cf.get(fig['section'], 'c_scale').strip().lower() == "flat":
+                    plt.colorbar(fig['ax']['a1'][0], axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
+            # axc.set_ylim(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
+            
+
+            ax.tick_params(
+                labelsize=fig['colorset']['ticks']['labelsize'], 
+                direction=fig['colorset']['ticks']['direction'], 
+                bottom=fig['colorset']['ticks']['bottom'], 
+                left=fig['colorset']['ticks']['left'], 
+                top=fig['colorset']['ticks']['top'], 
+                right=fig['colorset']['ticks']['right'],
+                which='both'
+            )
+            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+            axc.tick_params(
+                labelsize=fig['colorset']['colorticks']['labelsize'], 
+                direction=fig['colorset']['colorticks']['direction'], 
+                bottom=fig['colorset']['colorticks']['bottom'], 
+                left=fig['colorset']['colorticks']['left'], 
+                top=fig['colorset']['colorticks']['top'], 
+                right=fig['colorset']['colorticks']['right'], 
+                color=fig['colorset']['colorticks']['color']
+            )
+            # axc.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+
+            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
+            axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
+            ax.xaxis.set_label_coords(0.5, -0.068)
+
+            if self.cf.has_option(fig['section'], 'Line_draw'):
+                self.drawline(fig, ax)
+            
+            if self.cf.has_option(fig['section'], "Text"):
+                self.drawtext(fig, ax)
+
+            if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                from matplotlib.backends.backend_pdf import PdfPages
+                fig['fig'] = plt
+                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
+                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
+                self.compress_figure_to_PS(fig['file'])
+                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
+            if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                plt.show()
+
+
+
+
+
 
     def scatter_classify_data(self, fig, bo):
         x_sel = self.var_symbol(bo)
@@ -425,6 +579,19 @@ class Figure():
             fig['classify']['y'] = eval(y_info)
         elif y_info in fig['classify']['data'].columns.values:
             fig['classify']['y'] = fig['classify']['data'][y_info]
+        if self.cf.has_option(fig['section'], 'c_variable'):
+            c_info = self.cf.get(fig['section'], 'c_variable')
+            if c_info[0: 3] == '&Eq':
+                c_info = c_info[4:]
+                x_sel = self.var_symbol(c_info)
+                for x in x_sel:
+                    c_info = c_info.replace("_{}".format(x), "fig['classify']['data']['{}']".format(x))
+                if "&FC_" in c_info:
+                    for ii, func in enumerate(self.funcs):
+                        c_info = c_info.replace(func['name'], "self.funcs[{}]['expr']".format(ii))
+                fig['classify']['c'] = eval(c_info)
+            elif c_info in fig['classify']['data'].columns.values:
+                fig['classify']['c'] = fig['classify']['data'][c_info]
 
     def get_Linestyle(self, style):
         style_file = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get("COLORMAP", "StyleSetting"))
@@ -652,7 +819,7 @@ class Figure():
                 for it in a:
                     it = it.strip().strip('[').strip(']')
                     tk.append(float(it.split(',')[0]))
-                    label.append(it.split(',')[1].strip())
+                    label.append(r"{}".format(it.split(',')[1].strip()))
                 fig['ax']['ticks'][aa] = tuple([tk, label])
             else:
                 tick = tick.split(',')
@@ -685,6 +852,17 @@ class Figure():
         fig['var']['data'] = pd.DataFrame({
             'x':    fig['var']['x'],
             'y':    fig['var']['y']
+        })
+
+    def Get3DData(self, fig):
+        fig['var'] = {}
+        self.get_variable_data(fig, 'x', self.cf.get(fig['section'], 'x_variable'))
+        self.get_variable_data(fig, 'y', self.cf.get(fig['section'], 'y_variable'))
+        self.get_variable_data(fig, 'c', self.cf.get(fig['section'], 'c_variable'))
+        fig['var']['data'] = pd.DataFrame({
+            'x':    fig['var']['x'],
+            'y':    fig['var']['y'],
+            'c':    fig['var']['c']
         })
 
     def get_variable_data(self, fig, name, varinf):

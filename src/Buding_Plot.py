@@ -376,6 +376,12 @@ class Figure():
             ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
             ax.xaxis.set_label_coords(0.5, -0.068)
             
+            if self.cf.has_option(fig['section'], 'Line_draw'):
+                self.drawline(fig, ax)
+            
+            if self.cf.has_option(fig['section'], "Text"):
+                self.drawtext(fig, ax)
+
             if 'save' in self.cf.get(fig['section'], 'print_mode'):
                 from matplotlib.backends.backend_pdf import PdfPages
                 fig['fig'] = plt

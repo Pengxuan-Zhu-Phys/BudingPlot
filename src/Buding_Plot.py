@@ -300,21 +300,59 @@ class Figure():
             self.ax_setcmap(fig)
             # print(fig['colorset'])
             if self.cf.has_option(fig['section'], 'marker'):
-                marker = self.cf.get(fig['section'], 'marker').split(',')
-                fig['ax']['markercolor'] = marker[0].strip()
-                fig['ax']['markertype'] = marker[1].strip()
+                lines = self.cf.get(fig['section'], 'marker').split('\n')
+                if len(lines) == 1:
+                    marker = lines[0].split(',')
+                    if len(marker) == 2:
+                        fig['ax']['markercolor'] = marker[0].strip()
+                        fig['ax']['markertype'] = marker[1].strip()
+                        ax.scatter(
+                                fig['var']['data'].x, 
+                                fig['var']['data'].y, 
+                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                s=      fig['colorset']['marker']['size'],
+                                alpha=  fig['colorset']['marker']['alpha']
+                            )
+                    elif len(marker) > 2:
+                        if marker[2].strip()[0:3] == "&Bo":
+                            fig['ax']['markercolor'] = marker[0].strip()
+                            fig['ax']['markertype'] = marker[1].strip()
+                            self.scatter_classify_data(fig, marker[2].strip()[4:])
+                            ax.scatter(
+                                fig['classify']['x'],
+                                fig['classify']['y'],
+                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                s=      fig['colorset']['marker']['size'],
+                                alpha=  fig['colorset']['marker']['alpha']
+                            )
+                else:
+                    for line in lines:
+                        marker = line.split(',')
+                        if len(marker) > 2:
+                            fig['ax']['markercolor'] = marker[0].strip()
+                            fig['ax']['markertype'] = marker[1].strip()
+                            self.scatter_classify_data(fig, marker[2].strip()[4:])
+                            ax.scatter(
+                                fig['classify']['x'],
+                                fig['classify']['y'],
+                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                s=      fig['colorset']['marker']['size'],
+                                alpha=  fig['colorset']['marker']['alpha']
+                            )
             else:
                 fig['ax']['markercolor'] = 'Blue'
                 fig['ax']['markertype'] = 'round'
-
-            ax.scatter(
-                    fig['var']['data'].x, 
-                    fig['var']['data'].y, 
-                    marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
-                    c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
-                    s=      fig['colorset']['marker']['size'],
-                    alpha=  fig['colorset']['marker']['alpha']
-                )
+                ax.scatter(
+                        fig['var']['data'].x, 
+                        fig['var']['data'].y, 
+                        marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                        c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                        s=      fig['colorset']['marker']['size'],
+                        alpha=  fig['colorset']['marker']['alpha']
+                    )
             self.ax_setticks(fig, 'xy')
 
             ax.set_xticks(fig['ax']['ticks']['x'])
@@ -347,6 +385,40 @@ class Figure():
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
+
+    def scatter_classify_data(self, fig, bo):
+        x_sel = self.var_symbol(bo)
+        for x in x_sel:
+            bo = bo.replace("_{}".format(x), "fig['data']['{}']".format(x))
+        if "&FC_" in bo:
+            for ii, func in enumerate(self.funcs):
+                bo = bo.replace(func['name'], "self.funcs[{}]['expr']".format(ii))
+        fig['classify'] ={}
+        fig['classify']['data'] = fig['data'][eval(bo)].reset_index()
+        x_info = self.cf.get(fig['section'], 'x_variable')
+        if x_info[0: 3] == '&Eq':
+            x_info = x_info[4:]
+            x_sel = self.var_symbol(x_info)
+            for x in x_sel:
+                x_info = x_info.replace("_{}".format(x), "fig['classify']['data']['{}']".format(x))
+            if "&FC_" in x_info:
+                for ii, func in enumerate(self.funcs):
+                    x_info = x_info.replace(func['name'], "self.funcs[{}]['expr']".format(ii))
+            fig['classify']['x'] = eval(x_info)
+        elif x_info in fig['classify']['data'].columns.values:
+            fig['classify']['x'] = fig['classify']['data'][x_info]
+        y_info = self.cf.get(fig['section'], 'y_variable')
+        if y_info[0: 3] == '&Eq':
+            y_info = y_info[4:]
+            x_sel = self.var_symbol(y_info)
+            for x in x_sel:
+                y_info = y_info.replace("_{}".format(x), "fig['classify']['data']['{}']".format(x))
+            if "&FC_" in y_info:
+                for ii, func in enumerate(self.funcs):
+                    y_info = y_info.replace(func['name'], "self.funcs[{}]['expr']".format(ii))
+            fig['classify']['y'] = eval(y_info)
+        elif y_info in fig['classify']['data'].columns.values:
+            fig['classify']['y'] = fig['classify']['data'][y_info]
 
     def get_Linestyle(self, style):
         style_file = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get("COLORMAP", "StyleSetting"))
@@ -511,9 +583,6 @@ class Figure():
                 print("\tLine info Error: Unvaliable Text format {} \n\t Default Line Text Format used".format(style))
                 return {"FontSize": 20, "color": "#b71c1c", "alpha": 1.0} 
 
-
-
-
     def drawtext(self, fig, ax):
         def get_text_info(line):
             decode = re.compile(r'[(](.*?)[)]', re.S)
@@ -623,7 +692,7 @@ class Figure():
                     varinf = varinf.replace(self.funcs[ii]['name'], "self.funcs[{}]['expr']".format(ii))
             fig['var'][name] = eval(varinf)
         elif varinf in fig['data'].columns.values:
-            fig['var'][name] = fig['data'][name]
+            fig['var'][name] = fig['data'][varinf]
         else:
             print("No Variable {} found in Data!".format(varinf))
             sys.exit(0)
@@ -687,16 +756,17 @@ class Figure():
             if "&FC_" in bo:
                 for ii in range(len(self.funcs)):
                     bo = bo.replace(self.funcs[ii]['name'], "self.funcs[{}]['expr']".format(ii))
-            print("Total Data Rows is -> {}".format(self.data.shape))
+            # print("Total Data is -> {} rows".format(self.data.shape[0]))
             if "*Bool*" not in self.data.columns:
                 bool_list = np.ones(self.data.shape[0], dtype=np.bool)
                 self.data['*Bool*'] = bool_list
-                bo = bo + "and self.data['*Bool*']"
+                bo = bo + "& self.data['*Bool*']"
             else:
                 bool_list = np.ones(self.data.shape[0], dtype=np.bool)
                 self.data['abc**cba**bool**loob**alphabeta'] = bool_list
-                bo = bo + "and self.data['abc**cba**bool**loob**alphabeta']"
+                bo = bo + "& self.data['abc**cba**bool**loob**alphabeta']"
             fig['data'] = self.data[eval(bo)].reset_index()
+            print("Selected Data is -> {} rows".format(fig['data'].shape[0]))
 
 
 

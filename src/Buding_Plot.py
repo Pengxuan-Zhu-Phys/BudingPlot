@@ -361,10 +361,26 @@ class Figure():
                     )
             self.ax_setticks(fig, 'xy')
 
-            ax.set_xticks(fig['ax']['ticks']['x'])
-            ax.set_yticks(fig['ax']['ticks']['y'])
+            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                ax.set_xticks(fig['ax']['ticks']['x'])
+                ax.xaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                ax.set_xscale('log')
+            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+
+            if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                ax.set_yticks(fig['ax']['ticks']['y'])
+                ax.yaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                ax.set_yscale('log')
+            if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['y'][1])
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
+
             ax.xaxis.set_minor_locator(AutoMinorLocator())
             ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.tick_params(

@@ -1,5 +1,9 @@
 # BudingPlot
 
+					By: 	Buding
+
+
+
 ## Introduction 
 An easy to use plot tool. 
 

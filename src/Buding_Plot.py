@@ -26,6 +26,9 @@ import time
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
 import re 
+import ternary 
+import subprocess
+
 
 pwd = os.path.abspath(os.path.dirname(__file__))
 
@@ -441,8 +444,10 @@ class Figure():
                             fig['ax']['a1'].append(ax.scatter(
                                 fig['var']['data'].x,
                                 fig['var']['data'].y,
-                                marker  = fig['colorset']['scattermarker'][fig['ax']['markertype']],
                                 c       = fig['var']['data'].c,
+                                marker  = fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                s       = fig['colorset']['marker']['size'],
+                                alpha   = fig['colorset']['marker']['alpha'],
                                 cmap    = fig['colorset']['colormap'],
                                 vmin    = fig['ax']['lim']['c'][0],
                                 vmax    = fig['ax']['lim']['c'][1]
@@ -453,8 +458,10 @@ class Figure():
                                 fig['ax']['a1'].append(ax.scatter(
                                     fig['classify']['x'],
                                     fig['classify']['y'],
-                                    marker  = fig['colorset']['scattermarker'][fig['ax']['markertype']],
                                     c       = fig['classify']['c'],
+                                    marker  = fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                    s       = fig['colorset']['marker']['size'],
+                                    alpha   = fig['colorset']['marker']['alpha'],
                                     cmap    = fig['colorset']['colormap'],
                                     vmin    = fig['ax']['lim']['c'][0],
                                     vmax    = fig['ax']['lim']['c'][1]
@@ -556,11 +563,158 @@ class Figure():
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
+        elif fig['type'] == "TernaryRGB_Scatter":
+            print("\n=== Ploting Figure : {} ===".format(fig['name']))
+            fig['start'] = time.time()
+            self.load_ternary_configure(fig, "TernaryRGB")
+            self.makecanvas(fig)
+            self.init_ternary(fig, 'axt')
+            self.init_ternary(fig, 'axr')
+            self.init_ternary(fig, 'axg')
+            self.init_ternary(fig, 'axb')
+
+            self.basic_selection(fig)
+            self.getTernaryRGBData(fig)
+            fig['ax']['axt'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['c'], s=3, zorder=1, alpha=0.8)
+            fig['ax']['axr'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['r'], s=1, zorder=1, alpha=0.8)
+            fig['ax']['axg'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['g'], s=1, zorder=1, alpha=0.8)
+            fig['ax']['axb'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['b'], s=1, zorder=1, alpha=0.8)
+
+            self.set_Ternary_label(fig, 'axt')
+
+            if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                from matplotlib.backends.backend_pdf import PdfPages
+                fig['fig'] = plt
+                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
+                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
+                self.compress_figure_to_PS(fig['file'])
+                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
+            if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                plt.show()
 
 
 
+    def set_Ternary_label(self, fig, ax):
+        def setlabel(pa, pb, pc, label, sty):
+            posx = 0.5*(pa[0]+pb[0])
+            posy = 0.5*(pa[1]+pb[1])
+            posx = posx + sty['label']['offline']*(posx - pc[0])
+            posy = posy + sty['label']['offline']*(posy - pc[1])
+            fig['cv'].text(
+                posx,
+                posy,
+                r"${}$".format(self.cf.get(fig['section'], "{}_label".format(label))),
+                fontsize=sty['label']['fontsize'],
+                color=sty['label']['color'],
+                rotation= -1.0* sty['label']['rotation'][label],
+                horizontalalignment="center",
+                verticalalignment="center"
+            )
+
+        axs = "{}size".format(ax)
+        pointA = [fig['cf'][axs]['x'], fig['cf'][axs]['y']]
+        pointB = [fig['cf'][axs]['x'] + fig['cf'][axs]['width'], fig['cf'][axs]['y']]
+        pointC = [fig['cf'][axs]['x']+0.5*fig['cf'][axs]['width'], fig['cf'][axs]['y']+fig['cf'][axs]['height']]
+        axsty  = fig['cf'][fig['cf'][axs]["axisstyle"]]
+        setlabel(pointA, pointB, pointC, "bottom", axsty)
+        setlabel(pointB, pointC, pointA, "right", axsty)
+        setlabel(pointC, pointA, pointB, "left", axsty)
 
 
+    def load_ternary_configure(self, fig, label):
+        with open("{}/ternary_config.json".format(pwd), 'r') as f1:
+            data = json.load(f1)
+            for style in data:
+                if style['label'] == style['label']:
+                    fig['cf'] = style
+                    fig['fig'].set_figheight(fig['cf']['figureSize']['height'])
+                    fig['fig'].set_figwidth(fig['cf']['figureSize']['width'])
+                    break
+
+    def makecanvas(self, fig):
+        fig['fig'].set_figheight(fig['cf']['figureSize']['height'])
+        fig['fig'].set_figwidth(fig['cf']['figureSize']['width'])
+        fig['cv'] = fig['fig'].add_axes([0., 0., 1., 1.])
+        fig['cv'].axis("off")
+        fig['cv'].set_xlim(0, 1)
+        fig['cv'].set_ylim(0, 1)
+        fig['ax'] = {}
+    
+    def init_ternary(self, fig, ax):
+        def ticks(axs, spl, epl, info):
+            axsty = fig['cf'][fig['cf'][axs]['axisstyle']]['ticks']
+            if eval(axsty['switch']):
+                xl = np.linspace(spl[0], epl[0], fig['cf'][axs]["multiple"]+1)
+                yl = np.linspace(spl[1], epl[1], fig['cf'][axs]["multiple"]+1)
+                from math import sin, cos, radians
+                for ii in range(fig['cf'][axs]["multiple"]+1):
+                    fig['cv'].plot(
+                        [xl[ii], xl[ii]+axsty['length']*cos(radians(axsty['angle'][info]))],
+                        [yl[ii], yl[ii]+axsty['length']*sin(radians(axsty['angle'][info]))],
+                        '-',
+                        linewidth   = axsty['width'],
+                        color       = axsty['color'],
+                        solid_capstyle = axsty['end'],
+                        zorder=10000
+                    )
+                    fig['cv'].text( 
+                        xl[ii]+axsty['length']*cos(radians(axsty['angle'][info])) + axsty["labelshift"][info][0], 
+                        yl[ii]+axsty['length']*sin(radians(axsty['angle'][info])) + axsty["labelshift"][info][1],
+                        r"${:.1f}$".format(fig['cf'][axs]['scale'][0] + ii/fig['cf'][axs]["multiple"] *fig['cf'][axs]['scale'][1]),
+                        fontsize=axsty['fontsize'],
+                        rotation=axsty['fontangle'][info],
+                        horizontalalignment=axsty["labelshift"][info][2],
+                        verticalalignment=axsty["labelshift"][info][3]
+                    )
+        def gridline(axs, pa, pb, pc, info):
+            axsty = fig['cf'][fig['cf'][axs]['axisstyle']]['gridline']
+            if eval(axsty['switch']):
+                xd = np.linspace(pa[0], pb[0], fig['cf'][axs]['multiple']+1)
+                yd = np.linspace(pa[1], pb[1], fig['cf'][axs]['multiple']+1)
+                xe = np.linspace(pc[0], pb[0], fig['cf'][axs]['multiple']+1)
+                ye = np.linspace(pc[1], pb[1], fig['cf'][axs]['multiple']+1)
+            for ii in range(fig['cf'][axs]['multiple']-1):
+                plt.plot(
+                    [xd[ii+1], xe[ii+1]],
+                    [yd[ii+1], ye[ii+1]],
+                    axsty[info]['linestyle'],
+                    linewidth   = axsty[info]['linewidth'],
+                    color       = axsty[info]['color'],
+                    zorder      = 9999,
+                    transform   = fig['cv'].transAxes,
+                    alpha       = axsty['alpha']
+                )
+        
+        axs = "{}size".format(ax)
+        fig['ax'][ax] = fig['fig'].add_axes([
+            fig['cf'][axs]['x'],
+            fig['cf'][axs]['y'],
+            fig['cf'][axs]['width'],
+            fig['cf'][axs]['height']
+        ])
+        fig['ax'][ax].axis('off')
+
+        fig['cv'].plot(
+            [fig['cf'][axs]['x'], fig['cf'][axs]['x']+fig['cf'][axs]['width'], fig['cf'][axs]['x']+0.5*fig['cf'][axs]['width'], fig['cf'][axs]['x'], fig['cf'][axs]['x']+0.5*fig['cf'][axs]['width']],
+            [fig['cf'][axs]['y'], fig['cf'][axs]['y'], fig['cf'][axs]['y']+fig['cf'][axs]['height'], fig['cf'][axs]['y'],fig['cf'][axs]['y'] ], 
+            '-',
+            linewidth=fig['cf'][fig['cf'][axs]["axisstyle"]]['axisline']['width'],
+            color=fig['cf'][fig['cf'][axs]["axisstyle"]]['axisline']['color'],
+            solid_joinstyle='miter',
+            transform=fig['cv'].transAxes,
+            zorder=10000
+        )
+        pointA = [fig['cf'][axs]['x'], fig['cf'][axs]['y']]
+        pointB = [fig['cf'][axs]['x'] + fig['cf'][axs]['width'], fig['cf'][axs]['y']]
+        pointC = [fig['cf'][axs]['x']+0.5*fig['cf'][axs]['width'], fig['cf'][axs]['y']+fig['cf'][axs]['height']]
+        ticks(axs, pointC, pointA, "left")
+        ticks(axs, pointB, pointC, "right")
+        ticks(axs, pointA, pointB, "bottom")
+        gridline(axs, pointC, pointA, pointB, "left")
+        gridline(axs, pointB, pointC, pointA, "right")
+        gridline(axs, pointA, pointB, pointC, "bottom")
+        fig['ax'][ax].set_xlim(fig['cf'][axs]['scale'][0],fig['cf'][axs]['scale'][1] )
+        fig['ax'][ax].set_ylim(fig['cf'][axs]['scale'][0],fig['cf'][axs]['scale'][1] )
 
     def scatter_classify_data(self, fig, bo):
         x_sel = self.var_symbol(bo)
@@ -861,6 +1015,47 @@ class Figure():
                 fig['var'].pop('y')
                 fig['var'].pop('Stat')
 
+    def getTernaryRGBData(self, fig):
+        def var_normalize(a, b, c, d, e):
+            res = pd.DataFrame({
+                'left'  :   a,
+                'right' :   b,
+                'r'     :   c,
+                'g'     :   d,
+                'b'     :   e
+            })
+            res['sum']      = res['left'] + res['right'] + res['r'] + res['g'] + res['b']
+            res['left']     = res['left']/res['sum']
+            res['right']    = res['right']/res['sum']
+            res['r']        = res['r']/res['sum']
+            res['g']        = res['g']/res['sum']
+            res['b']        = res['b']/res['sum']
+            res['bottom']   = res['r'] + res['g'] + res['b']
+            maxrgb = max(max(res['r']), max(res['g']), max(res['b']))
+            res['r']        = np.power(res['r']/maxrgb, 0.5)
+            res['g']        = np.power(res['g']/maxrgb, 0.5)
+            res['b']        = np.power(res['b']/maxrgb, 0.5)
+            
+            return res 
+
+        if self.cf.has_option(fig['section'], 'left_variable') & self.cf.has_option(fig['section'], 'right_variable') & self.cf.has_option(fig['section'], 'r_variable') & self.cf.has_option(fig['section'], 'g_variable') &self.cf.has_option(fig['section'], 'b_variable'):
+            fig['var'] = {}
+            self.get_variable_data(fig, 'left', self.cf.get(fig['section'], 'left_variable'))
+            self.get_variable_data(fig, 'right', self.cf.get(fig['section'], 'right_variable'))
+            self.get_variable_data(fig, 'r', self.cf.get(fig['section'], 'r_variable'))
+            self.get_variable_data(fig, 'g', self.cf.get(fig['section'], 'g_variable'))
+            self.get_variable_data(fig, 'b', self.cf.get(fig['section'], 'b_variable'))
+
+            fig['var']['oridata'] = var_normalize(fig['var']['left'], fig['var']['right'], fig['var']['r'], fig['var']['g'], fig['var']['b'])
+            fig['var']['axdata'] = pd.DataFrame({
+                'x':    fig['var']['oridata']['bottom'] + 0.5*fig['var']['oridata']['right'],
+                'y':    fig['var']['oridata']['right']
+            })
+            fig['var']['axdata']['c'] = fig['var']['oridata'].apply(lambda  x: tuple([x['r'], x['g'], x['b']]), axis=1)           
+            fig['var']['axdata']['r'] = fig['var']['oridata'].apply(lambda  x: tuple([x['r'], 0., 0.]), axis=1)           
+            fig['var']['axdata']['g'] = fig['var']['oridata'].apply(lambda  x: tuple([0., x['g'], 0.]), axis=1)           
+            fig['var']['axdata']['b'] = fig['var']['oridata'].apply(lambda  x: tuple([0., 0., x['b']]), axis=1)           
+
     def Get2DData(self, fig):
         fig['var'] = {}
         self.get_variable_data(fig, 'x', self.cf.get(fig['section'], 'x_variable'))
@@ -968,6 +1163,36 @@ class Figure():
             fig['data'] = self.data[eval(bo)].reset_index()
             print("Selected Data is -> {} rows".format(fig['data'].shape[0]))
 
+
+
+def init(argv):
+    package = {'matplotlib': None, 'numpy': None, 'pandas': None, 'scipy': None, 'sympy': None, 'python-ternary': None, 'opencv-python': None}
+    out = subprocess.getoutput("pip3 freeze").split('\n')
+    tag = False
+    for ii in package.keys():
+        de = False
+        for line in out:
+            if line.split('==')[0] == ii:
+                package[ii] = line.split('==')[1]
+                de = True
+        if not de:
+            pipcmd = "pip3 install {} --user".format(ii)
+            if len(argv)>1:
+                if argv[1] == '-s':
+                    pipcmd += " -i https://pypi.tuna.tsinghua.edu.cn/simple/"
+            so = subprocess.getstatusoutput(pipcmd)
+            print("Installing Python Package {}".format(ii))
+            if so[0]:
+                tag = True
+    if not tag:
+        with open("{}/config.json".format(os.path.abspath(os.path.dirname(__file__))), 'w') as f1:
+            json.dump(package, f1)
+        import cv2
+        img = cv2.imread('{}/image-src/BPicon.jpg'.format(pwd))
+        cv2.imshow("Welcome to BudingPLOT", img)
+        cv2.waitKey(1)
+        time.sleep(3)
+        cv2.destroyAllWindows() 
 
 
 

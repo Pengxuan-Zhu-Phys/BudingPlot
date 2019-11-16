@@ -26,7 +26,6 @@ import time
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
 import re 
-import ternary 
 import subprocess
 
 
@@ -233,23 +232,29 @@ class Figure():
                     # print(fig['data'][fig['data']["chi2_h1"] == fig['var']['BestPoint']['Stat']])
 
             if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                ax.set_xticks(fig['ax']['ticks']['x'])
-                ax.xaxis.set_minor_locator(AutoMinorLocator())
+                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.set_xticks(fig['ax']['ticks']['x'])
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
                 ax.set_xscale('log')
             if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
                 ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
                 ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
 
             if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                ax.set_yticks(fig['ax']['ticks']['y'])
-                ax.yaxis.set_minor_locator(AutoMinorLocator())
+                if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                    ax.set_yticks(fig['ax']['ticks']['y'])
+                    ax.yaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
                 ax.set_yscale('log')
             if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['y'][1])
+                ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                ax.set_yticklabels(fig['ax']['ticks']['y'][1])
+                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
 
             ax.tick_params(
@@ -365,27 +370,31 @@ class Figure():
             self.ax_setticks(fig, 'xy')
 
             if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                ax.set_xticks(fig['ax']['ticks']['x'])
-                ax.xaxis.set_minor_locator(AutoMinorLocator())
+                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.set_xticks(fig['ax']['ticks']['x'])
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
                 ax.set_xscale('log')
             if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
                 ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
                 ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
 
             if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                ax.set_yticks(fig['ax']['ticks']['y'])
-                ax.yaxis.set_minor_locator(AutoMinorLocator())
+                if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                    ax.set_yticks(fig['ax']['ticks']['y'])
+                    ax.yaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
                 ax.set_yscale('log')
             if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['y'][1])
+                ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                ax.set_yticklabels(fig['ax']['ticks']['y'][1])
+                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
 
-            ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.tick_params(
                 labelsize=fig['colorset']['ticks']['labelsize'], 
                 direction=fig['colorset']['ticks']['direction'], 
@@ -492,23 +501,29 @@ class Figure():
 
             self.ax_setticks(fig, 'xyc')
             if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                ax.set_xticks(fig['ax']['ticks']['x'])
-                ax.xaxis.set_minor_locator(AutoMinorLocator())
+                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.set_xticks(fig['ax']['ticks']['x'])
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
                 ax.set_xscale('log')
             if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
                 ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
                 ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
             ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
 
             if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                ax.set_yticks(fig['ax']['ticks']['y'])
-                ax.yaxis.set_minor_locator(AutoMinorLocator())
+                if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                    ax.set_yticks(fig['ax']['ticks']['y'])
+                    ax.yaxis.set_minor_locator(AutoMinorLocator())
             elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
                 ax.set_yscale('log')
             if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['y'][1])
+                ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                ax.set_yticklabels(fig['ax']['ticks']['y'][1])
+                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
                         
             
@@ -575,10 +590,10 @@ class Figure():
 
             self.basic_selection(fig)
             self.getTernaryRGBData(fig)
-            fig['ax']['axt'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['c'], s=3, zorder=1, alpha=0.8)
+            fig['ax']['axt'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['c'], s=5, zorder=1, alpha=1)
             fig['ax']['axr'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['r'], s=1, zorder=1, alpha=0.8)
             fig['ax']['axg'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['g'], s=1, zorder=1, alpha=0.8)
-            fig['ax']['axb'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['b'], s=1, zorder=1, alpha=0.8)
+            fig['ax']['axb'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['b'], s=1.5, zorder=1, alpha=1)
 
             self.set_Ternary_label(fig, 'axt')
 
@@ -592,7 +607,11 @@ class Figure():
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
 
-
+        elif fig['type'] == "Ternary_Scatter":
+            print("\n=== Ploting Figure : {} ===".format(fig['name']))
+            fig['start'] = time.time()
+            self.load_ternary_configure(fig, "Ternary_Default")
+            self.makecanvas(fig)
 
     def set_Ternary_label(self, fig, ax):
         def setlabel(pa, pb, pc, label, sty):
@@ -1031,10 +1050,10 @@ class Figure():
             res['g']        = res['g']/res['sum']
             res['b']        = res['b']/res['sum']
             res['bottom']   = res['r'] + res['g'] + res['b']
-            maxrgb = max(max(res['r']), max(res['g']), max(res['b']))
-            res['r']        = np.power(res['r']/maxrgb, 0.5)
-            res['g']        = np.power(res['g']/maxrgb, 0.5)
-            res['b']        = np.power(res['b']/maxrgb, 0.5)
+            maxrg = max(max(res['r']), max(res['g']))
+            res['r']        = np.power(res['r']/maxrg, 0.5)
+            res['g']        = np.power(res['g']/maxrg, 0.5)
+            res['b']        = np.power(res['b']/max(res['b']), 0.25)
             
             return res 
 
@@ -1052,9 +1071,9 @@ class Figure():
                 'y':    fig['var']['oridata']['right']
             })
             fig['var']['axdata']['c'] = fig['var']['oridata'].apply(lambda  x: tuple([x['r'], x['g'], x['b']]), axis=1)           
-            fig['var']['axdata']['r'] = fig['var']['oridata'].apply(lambda  x: tuple([x['r'], 0., 0.]), axis=1)           
-            fig['var']['axdata']['g'] = fig['var']['oridata'].apply(lambda  x: tuple([0., x['g'], 0.]), axis=1)           
-            fig['var']['axdata']['b'] = fig['var']['oridata'].apply(lambda  x: tuple([0., 0., x['b']]), axis=1)           
+            fig['var']['axdata']['r'] = fig['var']['oridata'].apply(lambda  x: tuple([x['r'], 0.3*x['r'], 0.]), axis=1)           
+            fig['var']['axdata']['g'] = fig['var']['oridata'].apply(lambda  x: tuple([0.3*x['g'], x['g'], 0.]), axis=1)           
+            fig['var']['axdata']['b'] = fig['var']['oridata'].apply(lambda  x: tuple([0.3*x['b'], 0.42*x['b'], x['b']]), axis=1)           
 
     def Get2DData(self, fig):
         fig['var'] = {}

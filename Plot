@@ -9,7 +9,7 @@ sys.path.append("{}/src/".format(pwd))
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         if sys.argv[1] == 'init':
-            from Buding_Plot import init 
+            from Func_lab import init 
             init(sys.argv[1:])
         else:
             from Buding_Plot import Figure

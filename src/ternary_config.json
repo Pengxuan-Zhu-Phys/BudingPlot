@@ -203,5 +203,99 @@
                 "alpha": 0.4
             }
         }
+    },
+    {
+        "label": "Ternary",
+        "figureSize": {
+            "width": 10,
+            "height": 7.09
+        },
+        "axtsize": {
+            "x": 0.112,
+            "y": 0.158,
+            "width": 0.56,
+            "height": 0.684,
+            "scale": [
+                0,
+                1
+            ],
+            "multiple": 10,
+            "axisstyle": "axstyle"
+        },
+        "axstyle": {
+            "axisline": {
+                "width": 2.5,
+                "color": "black",
+                "tickslength": 0.02
+            },
+            "ticks": {
+                "switch": "True",
+                "length": 0.01,
+                "width": 1.5,
+                "end": "round",
+                "color": "black",
+                "angle": {
+                    "left": 114,
+                    "right": 0,
+                    "bottom": -114
+                },
+                "fontsize": 12,
+                "fontangle": {
+                    "left": -60,
+                    "right": 0,
+                    "bottom": 60
+                },
+                "labelshift": {
+                    "left": [
+                        0.005,
+                        0.02,
+                        "right",
+                        "center"
+                    ],
+                    "right": [
+                        0.005,
+                        0,
+                        "left",
+                        "center"
+                    ],
+                    "bottom": [
+                        0.005,
+                        -0.02,
+                        "right",
+                        "center"
+                    ]
+                }
+            },
+            "label": {
+                "switch": "True",
+                "offline": 0.12,
+                "fontsize": 24,
+                "color": "black",
+                "rotation": {
+                    "left": -58,
+                    "right": 58,
+                    "bottom": 0
+                }
+            },
+            "gridline": {
+                "switch": "True",
+                "left": {
+                    "linestyle": ":",
+                    "linewidth": 1.2,
+                    "color": "#9e9e9e"
+                },
+                "right": {
+                    "linestyle": ":",
+                    "linewidth": 1.2,
+                    "color": "#9e9e9e"
+                },
+                "bottom": {
+                    "linestyle": ":",
+                    "linewidth": 1.2,
+                    "color": "#9e9e9e"
+                },
+                "alpha": 0.8
+            }
+        }
     }
 ]

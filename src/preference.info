@@ -68,6 +68,35 @@
             "left":     False,
             "right":    False,
             "color":    'w'
+        },
+        "1dpdf":    {
+            "line": {
+                "color":    "#5669e2",
+                "width":    2.6,
+                "alpha":    1.0
+            },
+            "bestpoint":    [
+                {
+                    "color":    "#132852",
+                    "width":    2.5,
+                    "alpha":    0.8
+                },
+                {
+                    "color":    "#141518",
+                    "width":    1.5,
+                    "alpha":    1.0
+                }
+            ],
+            "1sigma":   {
+                "facecolor":   "green",
+                "edge":         "green",
+                "alpha":        0.8
+            },
+            "2sigma":   {
+                "facecolor":    "Yellow",
+                "edge":         "orange",
+                "alpha":        0.5
+            }
         }
 
     },
@@ -176,6 +205,42 @@
             "left":     False,
             "right":    False,
             "color":    'Black'
+        },
+        "1dpdf":    {
+            "line": {
+                "color":    "#011938",
+                "width":    1.6,
+                "alpha":    1.0
+            },
+            "bestpoint":    [
+                {
+                    "color":    "#132852",
+                    "width":    2.5,
+                    "alpha":    0.8
+                },
+                {
+                    "color":    "#141518",
+                    "width":    1.5,
+                    "alpha":    1.0
+                }
+            ],
+            "pdfmode":  [
+                {
+                    "color":    "#00f8f8",
+                    "width":    2.5,
+                    "alpha":    1.0
+                }
+            ],
+            "1sigma":   {
+                "facecolor":   "#2eb440",
+                "edge":         "#2eb440",
+                "alpha":        0.8
+            },
+            "2sigma":   {
+                "facecolor":    "Yellow",
+                "edge":         "orange",
+                "alpha":        0.5
+            }
         }
     }
 ]

@@ -23,8 +23,7 @@ from scipy.interpolate import Rbf
 import math
 import configparser
 import time
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
-                               AutoMinorLocator)
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, FixedLocator, NullLocator, AutoMinorLocator)
 import re 
 import subprocess
 
@@ -170,8 +169,8 @@ class Figure():
                 }).fillna({'PL': -0.1})
             elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
                 XI, YI = np.meshgrid(
-                    np.logspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    np.logspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                                       
+                    np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)                                     
                 )
                 fig['ax']['var'] = {
                     'x':    XI,
@@ -578,6 +577,213 @@ class Figure():
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
+        elif fig['type'] == "1D_Stat":
+            print("\n=== Ploting Figure : {} ===".format(fig['name']))
+            fig['start'] = time.time()
+            self.basic_selection(fig)
+            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
+            self.Get1DStatData(fig)
+            if 'x' in fig['var']['type'] and 'CHI2' in fig['var']['type'] and 'PDF' in fig['var']['type']:
+                ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
+
+                fig['var']['BestPoint'] = {
+                    'x':    fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].x,
+                    'CHI2': fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].CHI2, 
+                    'PDF':  fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].PDF
+                }
+                fig['var']['data'] = fig['var']['data'].assign( PL=lambda x: np.exp( -0.5 * x.CHI2 )/np.exp( -0.5 * fig['var']['BestPoint']['CHI2']) )
+                fig['var']['lim'] = {
+                    'x':    [fig['var']['data'].x.min(), fig['var']['data'].x.max()]
+                }
+                fig['ax'] = {}
+                self.ax_setlim(fig, 'x')
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    XXGrid = np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                    XI = np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                    fig['ax']['var'] = {
+                        'x':    XI,
+                        'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin'))
+                    }
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xx":   XI
+                    })
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xi":   fig['ax']['grid']['xx'],
+                        "xxgrid":   XXGrid,
+                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= tt['xx'] -0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) ].PL.max(axis=0, skipna=True), axis=1),
+                        'PDF':  fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= tt['xx'] -0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) ].PDF.sum(), axis=1)
+                    }).fillna({"PL": 0.0, "PDF": 0.0})
+                    from scipy.stats import gaussian_kde 
+                    # pdfkde = gaussian_kde(fig['ax']['grid'].xi, bw_method=0.03*fig['ax']['var']['dx'], weights=fig['ax']['grid'].PDF)
+                    if self.cf.has_option(fig['section'], 'pdf_kde_bw'):
+                        fig['ax']['pdf_kde_bw'] = float(self.cf.get(fig['section'], 'pdf_kde_bw'))
+                    else:
+                        fig['ax']['pdf_kde_bw'] = 'silverman'
+                    fig["ax"]["pdfkde"] = gaussian_kde(fig['ax']['grid'].xxgrid, bw_method=fig['ax']['pdf_kde_bw'], weights=fig['ax']['grid'].PDF)
+                    xgrid = np.linspace(0, 1, 10000)
+                    fig['ax']['pdfkdedata'] = pd.DataFrame({
+                        'xx':   np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], 10000),
+                        'pdf':  fig["ax"]["pdfkde"].evaluate(xgrid),
+                    })
+                    fig['var']['BestPoint']['PDF'] = fig['ax']['pdfkde'].evaluate(fig['var']['BestPoint']['x'])/fig['ax']['pdfkdedata']['pdf'].max()
+                    fig['ax']['pdfkdedata']['pdf'] = fig['ax']['pdfkdedata']['pdf']/fig['ax']['pdfkdedata']['pdf'].max()
+                    fig['ax']['pdfpara'] = {
+                        'norm':                     sum(fig['ax']['pdfkdedata'].pdf),
+                        '1sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.675),
+                        '2sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.95),
+                        'mode':                     fig['ax']['pdfkdedata'].iloc[fig['ax']['pdfkdedata'].pdf.idxmax()].xx
+                    }
+                    axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
+                    plgrid = axpl(np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], 10000))
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                    XXGrid = np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                    XI = np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                    fig['ax']['var'] = {
+                        'x':    XI,
+                        'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin'))
+                    }
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xx":   XI
+                    })
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xi":   fig['ax']['grid']['xx'],
+                        "xxgrid":   XXGrid,
+                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= 10**(math.log10(tt['xx']) -0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) ].PL.max(axis=0, skipna=True), axis=1),
+                        'PDF':  fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= 10**(math.log10(tt['xx']) -0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) ].PDF.sum(), axis=1)
+                    }).fillna({'PL': 0.0, 'PDF': 0.0})
+                    # print(fig['ax']['grid'])
+                    from scipy.stats import gaussian_kde 
+                    # pdfkde = gaussian_kde(fig['ax']['grid'].xi, bw_method=0.03*fig['ax']['var']['dx'], weights=fig['ax']['grid'].PDF)
+                    if self.cf.has_option(fig['section'], 'pdf_kde_bw'):
+                        fig['ax']['pdf_kde_bw'] = float(self.cf.get(fig['section'], 'pdf_kde_bw'))
+                    else:
+                        fig['ax']['pdf_kde_bw'] = 'silverman'
+                    fig["ax"]["pdfkde"] = gaussian_kde(fig['ax']['grid'].xxgrid, bw_method=fig['ax']['pdf_kde_bw'], weights=fig['ax']['grid'].PDF)
+                    xgrid = np.linspace(0, 1, 10000)
+                    fig['ax']['pdfkdedata'] = pd.DataFrame({
+                        'xx':   np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), 10000), 
+                        'pdf':  fig["ax"]["pdfkde"].evaluate(xgrid),
+                    })
+
+                    fig['var']['BestPoint']['PDF'] = fig['ax']['pdfkde'].evaluate(fig['var']['BestPoint']['x'])/fig['ax']['pdfkdedata']['pdf'].max()
+                    fig['ax']['pdfkdedata']['pdf'] = fig['ax']['pdfkdedata']['pdf']/fig['ax']['pdfkdedata']['pdf'].max()
+                    fig['ax']['pdfpara'] = {
+                        'norm':                     sum(fig['ax']['pdfkdedata'].pdf),
+                        '1sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.675),
+                        '2sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.95),
+                        'mode':                     fig['ax']['pdfkdedata'].iloc[fig['ax']['pdfkdedata'].pdf.idxmax()].xx
+                    }
+                    axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
+                    plgrid = axpl(np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), 10000))
+                    ax.set_xscale("log")
+                self.ax_setcmap(fig)
+                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.09, -0.12, where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['2sigma_critical_prob'], edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5 )
+                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.09, -0.12, where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['1sigma_critical_prob'], edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'],facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'], alpha=fig['colorset']['1dpdf']['1sigma']['alpha'],zorder=6)                
+                ax.fill_between( fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'],  where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['2sigma_critical_prob'],  edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5 )
+                ax.fill_between( fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'],  where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['1sigma_critical_prob'],  edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6 )
+                ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+                ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0, 0], '-', color='grey', linewidth=0.8, zorder=0)
+                ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0.1354, 0.1354], '--', color='#ea4702', linewidth=1.2, zorder=0)
+                ax.text(0.025, 0.237, r"$95.4\%~{\rm C.L.}$", fontsize=12, transform=ax.transAxes)
+                ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0.60583, 0.60583], '--', color='#ea4702', linewidth=1.2, zorder=0)
+                ax.text(0.025, 0.595, r"$68.3\%~{\rm C.L.}$", fontsize=12, transform=ax.transAxes)
+                ax.set_ylim(-0.16, 1.15)                 
+                if self.cf.has_option(fig['section'], "BestPoint"):
+                    for item in fig['colorset']['1dpdf']['bestpoint']:
+                        ax.plot( [fig['var']['BestPoint']['x'], fig['var']['BestPoint']['x']], [-0.069, -0.041 ], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7               )   
+                    for item in fig['colorset']['1dpdf']['pdfmode']:             
+                        ax.plot( [fig['ax']['pdfpara']['mode'], fig['ax']['pdfpara']['mode']], [0.001, 0.999 ], '-',linewidth=item['width'],color=item['color'],alpha=item['alpha'],zorder=7)
+                        ax.plot( [fig['ax']['pdfpara']['mode'], fig['ax']['pdfpara']['mode']], [-0.09, -0.12 ], '-',linewidth=item['width'],color=item['color'],alpha=item['alpha'],zorder=7 )
+                ax.fill_between(fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'], color="w", alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=1)                
+                ax.plot(fig['ax']['pdfkdedata']['xx'], fig['ax']['pdfkdedata']['pdf'], '-', linewidth = fig['colorset']['1dpdf']['line']['width'], color=fig['colorset']['1dpdf']['line']['color'], alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=10)
+                ax.fill_between( fig['ax']['grid']['xi'], 0, fig['ax']['grid']['PL'], color='red', step='mid', alpha=0.1, zorder=0 )
+                ax.step(fig['ax']['grid']['xi'],fig['ax']['grid']['PL'],color='red',where='mid',zorder=9)  
+                # axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
+                # plgrid = axpl(xgrid)
+                # ax.fill_between( fig['ax']['grid']['xi'], -0.07, -0.04, where=fig['ax']['grid']['PL']>0.1354, color='#f8a501', step='mid', alpha=0.8 )
+                # ax.fill_between( fig['ax']['grid']['xi'], -0.07, -0.04, where=fig['ax']['grid']['PL']>0.60583, color='#10a6e7', step='mid', alpha=0.7 )                
+                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.07, -0.04, where=plgrid>0.1354, color='#f8a501', step='mid', alpha=0.8 )
+                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.07, -0.04, where=plgrid>0.60583, color='#10a6e7', step='mid', alpha=0.7 )
+            self.ax_setticks(fig, 'x')
+
+            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.set_xticks(fig['ax']['ticks']['x'])
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
+            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                ax.set_xscale('log')
+            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    ax.xaxis.set_minor_locator(AutoMinorLocator())
+            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+            ax.yaxis.set_minor_locator(FixedLocator(np.linspace(0, 1, 26)))
+
+            ax.tick_params( labelsize=fig['colorset']['ticks']['labelsize'],  direction=fig['colorset']['ticks']['direction'],  bottom=fig['colorset']['ticks']['bottom'],  left=fig['colorset']['ticks']['left'],  top=fig['colorset']['ticks']['top'],  right=fig['colorset']['ticks']['right'], which='both' )
+            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'chi2_label')), fontsize=30)
+            ax.xaxis.set_label_coords(0.5, -0.068)
+            plax = ax.secondary_yaxis("right")
+            plax.set_ylabel(r"{}".format(self.cf.get(fig['section'], "pdf_label")), fontsize=30)
+            plax.yaxis.set_major_locator(FixedLocator([]))
+            plax.tick_params( labelsize=3, labelcolor="None",  direction=fig['colorset']['ticks']['direction'] )
+
+            if self.cf.has_option(fig['section'], 'Line_draw'):
+                self.drawline(fig, ax)
+            
+            if self.cf.has_option(fig['section'], "Text"):
+                self.drawtext(fig, ax)
+
+            if self.cf.has_option(fig['section'], "drawlegend"):
+                if eval(self.cf.get(fig['section'], "drawlegend")):
+                    print("\tTimer: {:.2f} Second;  Drawing default format legend ...".format(time.time()-fig['start']))
+                    axlegend = fig['fig'].add_axes([0.14, 0.875, 0.72, 0.07])
+                    axlegend.spines['top'].set_visible(False)
+                    axlegend.spines['bottom'].set_visible(False)
+                    axlegend.spines['left'].set_visible(False)
+                    axlegend.spines['right'].set_visible(False)
+                    axlegend.xaxis.set_major_locator(NullLocator())
+                    axlegend.yaxis.set_major_locator(NullLocator())
+                    axlegend.set_xlim(0, 100)
+                    axlegend.set_ylim(-2.5, 2)
+                    axlegend.step([2,3,5,7,9, 10], [0.5, 0.5, 1.3, 1.5, 0.2, 0.2], color='red', where='mid', zorder=0)
+                    axlegend.fill_between([2,3,5,7,9, 10], 0, [0.5, 0.5, 1.3, 1.5, 0.2, 0.2], color='red', step='mid', alpha=0.1)
+                    axlegend.text(12, 0.2, r"$\rm Profile~Likelihood$", fontsize=10.5)
+                    axlegend.fill_between([2, 10], -0.7, -2, color='#f8a501', step='mid', alpha=0.8)
+                    axlegend.fill_between([4, 8], -0.7, -2,  color='#10a6e7', step='mid', alpha=0.7)
+                    axlegend.text(12, -1.9, r"$\rm Best$-$\rm fit~point,~1\sigma~\&~2\sigma~confidence~interval$", fontsize=10.5)
+                    legendxi = np.linspace(52, 60, 100)
+                    legendyy = 1.5 * np.exp(-(legendxi-55.0)**2/2) + 0.6 * np.exp(-(legendxi-58)**2/ 1.5 )
+                    axlegend.plot(legendxi, legendyy, '-', linewidth = fig['colorset']['1dpdf']['line']['width'], color=fig['colorset']['1dpdf']['line']['color'], alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=10)
+                    axlegend.fill_between(legendxi, 0, legendyy, color='w', zorder=1)
+                    axlegend.fill_between(legendxi, 0, legendyy, where=legendyy>0.23, edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5)
+                    axlegend.fill_between(legendxi, 0, legendyy, where=legendyy>0.72, edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6)
+                    axlegend.fill_between(legendxi, -0.7, -2, where=legendyy>0.23, edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5)
+                    axlegend.fill_between(legendxi, -0.7, -2, where=legendyy>0.72, edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6)
+                    if self.cf.has_option(fig['section'], "BestPoint"):
+                        for item in fig['colorset']['1dpdf']['pdfmode']:
+                            axlegend.plot( [55.0, 55.0], [0.05, 1.45 ], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7)
+                            axlegend.plot( [55.0, 55.0], [-0.8, -1.95], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7)  
+                        for item in fig['colorset']['1dpdf']['bestpoint']:
+                            axlegend.plot( [7.0, 7.0], [-0.8, -1.95], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7 )
+                    axlegend.text(62, 0.2, r"$\rm Posterior~PDF$", fontsize=10.5)
+                    axlegend.text(62, -1.9, r"$\rm PDF~mode, ~1\sigma~\&~2\sigma~credible~region$", fontsize=10.5)
+
+            if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                from matplotlib.backends.backend_pdf import PdfPages
+                fig['fig'] = plt
+                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
+                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
+                self.compress_figure_to_PS(fig['file'])
+                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
+            if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                plt.show()
+
+
+
         elif fig['type'] == "TernaryRGB_Scatter":
             print("\n=== Ploting Figure : {} ===".format(fig['name']))
             fig['start'] = time.time()
@@ -606,12 +812,34 @@ class Figure():
                 print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
             if 'show' in self.cf.get(fig['section'], 'print_mode'):
                 plt.show()
-
         elif fig['type'] == "Ternary_Scatter":
             print("\n=== Ploting Figure : {} ===".format(fig['name']))
             fig['start'] = time.time()
             self.load_ternary_configure(fig, "Ternary_Default")
             self.makecanvas(fig)
+
+
+    def find_critical_prob(self, data, prob):
+        norm = data['pdf'].sum()
+        temp_pdf = data.sort_values(by=['pdf'], ascending=True)
+        temp_pdf = temp_pdf.reset_index()
+        temp_pdf.pop("index")
+        idx = {
+            'min':  0,
+            'upp':  temp_pdf.shape[0]-1,
+            'id':   temp_pdf.shape[0]//2,
+            'flag': True
+        }
+        while idx['flag']:
+            if idx['upp'] - idx['min'] < 2:
+                idx['flag'] = False 
+            elif temp_pdf['pdf'][idx['id']:].sum() / norm > prob:
+                idx['min'] = idx['id']
+                idx['id'] = (idx['upp']+idx['min'])//2
+            else:
+                idx['upp'] = idx['id']
+                idx['id'] = (idx['upp']+idx['min'])//2
+        return temp_pdf['pdf'][idx['id']]
 
     def set_Ternary_label(self, fig, ax):
         def setlabel(pa, pb, pc, label, sty):
@@ -638,7 +866,6 @@ class Figure():
         setlabel(pointA, pointB, pointC, "bottom", axsty)
         setlabel(pointB, pointC, pointA, "right", axsty)
         setlabel(pointC, pointA, pointB, "left", axsty)
-
 
     def load_ternary_configure(self, fig, label):
         with open("{}/ternary_config.json".format(pwd), 'r') as f1:
@@ -1013,8 +1240,8 @@ class Figure():
             else:
                 tick = tick.split(',')
                 for ii in range(len(tick)):
-                    tick[ii] = float(tick[ii].strip())
-                fig['ax']['ticks'][aa] = np.linspace(tick[0], tick[1], tick[2])
+                    tick[ii] = tick[ii].strip()
+                fig['ax']['ticks'][aa] = np.linspace(float(tick[0]), float(tick[1]), int(tick[2]))
             if aa == 'y':
                 if fig['ax']['lim']['y'][0] in fig['ax']['ticks']['y']:
                     fig['ax']['ticks']['y'] = fig['ax']['ticks']['y'][np.where(fig['ax']['ticks']['y'] != fig['ax']['lim']['y'][0])]
@@ -1033,6 +1260,42 @@ class Figure():
                 fig['var'].pop('x')
                 fig['var'].pop('y')
                 fig['var'].pop('Stat')
+
+    def Get1DStatData(self, fig):
+        if self.cf.has_option(fig['section'], "stat_variable"):
+            fig['var'] = {}
+            self.get_variable_data(fig, 'x', self.cf.get(fig['section'], 'x_variable'))
+            for line in self.cf.get(fig['section'], 'stat_variable').split('\n'):
+                if line.split(",")[0].strip() == 'CHI2':
+                    self.get_variable_data(fig, 'CHI2', ','.join(line.split(",")[1:]).strip())
+                if line.split(',')[0].strip() == 'PDF':
+                    self.get_variable_data(fig, 'PDF', ','.join(line.split(',')[1:]).strip())
+            if 'CHI2' in fig['var'].keys() and 'PDF' in fig['var'].keys():
+                fig['var']['data'] = pd.DataFrame({
+                    "x":    fig['var']['x'],
+                    "CHI2": fig['var']['CHI2'],
+                    "PDF":  fig['var']['PDF']    
+                })
+                fig['var'].pop('x')
+                fig['var'].pop("PDF")
+                fig['var'].pop('CHI2')
+                fig['var']['type'] = ["x", "PDF", "CHI2"]
+            elif 'CHI2' in fig['var'].keys():
+                fig['var']['data'] = pd.DataFrame({
+                    "x":    fig['var']['x'],
+                    "CHI2": fig['var']['CHI2']
+                })
+                fig['var'].pop('x')
+                fig['var'].pop('CHI2')
+                fig['var']['type'] = ['x', 'CHI2']
+            elif 'PDF' in fig['var'].keys():
+                fig['var']['data'] = pd.DataFrame({
+                    "x":    fig['var']['x'],
+                    "PDF":  fig['var']['PDF']    
+                })
+                fig['var'].pop('x')
+                fig['var'].pop("PDF")
+                fig['var']['type'] = ['x', 'PDF']
 
     def getTernaryRGBData(self, fig):
         def var_normalize(a, b, c, d, e):

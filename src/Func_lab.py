@@ -7,7 +7,7 @@ import time
 pwd = os.path.abspath(os.path.dirname(__file__))
 
 def init(argv):
-    package = {'matplotlib': None, 'numpy': None, 'pandas': None, 'scipy': None, 'sympy': None, 'python-ternary': None, 'opencv-python': None, 'seaborn': None}
+    package = {'matplotlib': None, 'numpy': None, 'pandas': None, 'scipy': None, 'sympy': None, 'python-ternary': None, 'opencv-python': None, 'seaborn': None, 'emoji': None}
     out = subprocess.getoutput("pip3 freeze").split('\n')
     tag = False
     for ii in package.keys():

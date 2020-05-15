@@ -14,7 +14,7 @@ if __name__ == "__main__":
         else:
             from Buding_Plot import Figure
             fig = Figure()
-            fig.get_inf("{}/{}".format(pwd, sys.argv[1]))
+            fig.get_inf(os.path.abspath(sys.argv[1]))
             fig.plot()
 
 

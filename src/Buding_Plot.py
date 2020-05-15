@@ -26,7 +26,7 @@ import time
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, FixedLocator, NullLocator, AutoMinorLocator)
 import re 
 import subprocess
-
+import emoji
 
 pwd = os.path.abspath(os.path.dirname(__file__))
 
@@ -37,14 +37,18 @@ class Figure():
     def get_inf(self, inf):
         self.cf = configparser.ConfigParser()
         self.cf.read(inf)
+        # print(os.path.dirname(inf), os.path.abspath(inf))
+        if self.cf.get("PLOT_CONFI", "path").strip().upper() == "&PWD":
+            self.cf.set("PLOT_CONFI", "path", os.path.dirname(inf))
+        # print()
     
     def load_data(self):
         self.data = []
         for opt in self.cf.get("PLOT_CONFI", 'result_file').split('\n'):
-            dat = pd.read_csv("{}{}".format(self.cf.get('PLOT_CONFI', 'path'), opt.split()[1]))
+            dat = pd.read_csv(os.path.join(self.cf.get('PLOT_CONFI', 'path'), opt.split()[1]))
             # dat = dat.drop(["Index"], axis=1)
             self.data.append(dat)
-        self.data = pd.concat(self.data, axis=0, join='outer', ignore_index=True)
+        self.data = pd.concat(self.data, axis=0, join='outer', ignore_index=True, sort=False)
 
     def load_colorset(self):
         if self.cf.has_option('COLORMAP', 'colorset'):
@@ -61,7 +65,7 @@ class Figure():
                     cset['cmap'] = cs.split('|')[1].strip()
                 self.colors[self.colors.index(cs)] = cset
         elif self.cf.has_option("COLORMAP", 'colorsetting'):
-            with open("{}{}".format(self.cf.get('PLOT_CONFI', 'path'), self.cf.get('COLORMAP', 'colorsetting')), 'r', encoding='utf-8') as f1:
+            with open(os.path.join(pwd, self.cf.get('COLORMAP', 'colorsetting')), 'r', encoding='utf-8') as f1:
                 # self.colors = json.load(f1)
                 self.colors = eval(f1.read())
             for ii in range(len(self.colors)):
@@ -82,368 +86,360 @@ class Figure():
     # Plot Method is write in the drawpicture :
     # Add " elif fig['type'] == $FIGURE_TYPE$: "
     def drawpicture(self, fig):
+        fig['start'] = time.time()
         fig['fig'] = plt.figure(figsize=(10, 8))
         fig['fig'].text(0., 0., "Test", color="None")
         fig['fig'].text(1., 1., "Test", color="None")
-        if fig['type'] == "2D_Stat_Profile":
-            print("\n=== Ploting Figure : {} ===".format(fig['name']))
-            fig['start'] = time.time()
-            ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
-            axc = fig['fig'].add_axes([0.875, 0.13, 0.015, 0.83])
-            self.basic_selection(fig)
-            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
-            self.GetStatData(fig)
-            fig['var']['BestPoint'] = {
-                'x':    fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].x,
-                'y':    fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].y,
-                'Stat': fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].Stat
-            }
-            # Two Method to achieve Profile Likelihood Data in Pandas! Lambda expr is more compact in code
-            # fig['var']['data'] = fig['var']['data'].assign( PL=np.exp( -0.5 * fig['var']['data'].Stat )/np.exp(-0.5 * fig['var']['BestPoint']['Stat'])  )
-            fig['var']['data'] = fig['var']['data'].assign( PL=lambda x: np.exp( -0.5 * x.Stat )/np.exp(-0.5 * fig['var']['BestPoint']['Stat'])  )
-            fig['var']['lim'] = {
-                'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
-                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
-            }
-            fig['ax'] = {}
-            self.ax_setlim(fig, 'xyc')
-            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                XI, YI = np.meshgrid(
-                    np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                
-                )
-                fig['ax']['var'] = {
-                    'x':    XI,
-                    'y':    YI,
-                    'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
-                    'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
+        print("\n=== Ploting Figure : {} ===".format(fig['name']))
+        self.basic_selection(fig)
+        if fig['data'].shape[0] < 1:
+            print(emoji.emojize('\t:ghost::ghost::ghost: No data selected!!\n\tPlease check your Data or the selection condition \n', use_aliases=True))
+        else:
+            print(emoji.emojize("\t:space_invader::space_invader::space_invader: Selected Data is -> {} rows".format(fig['data'].shape[0]), use_aliases=True))
+            if fig['type'] == "2D_Stat_Profile":
+                ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
+                axc = fig['fig'].add_axes([0.875, 0.13, 0.015, 0.83])
+                print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
+                self.GetStatData(fig)
+                fig['var']['BestPoint'] = {
+                    'x':    fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].x,
+                    'y':    fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].y,
+                    'Stat': fig['var']['data'].loc[fig['var']['data'].Stat.idxmin()].Stat
                 }
-                fig['ax']['grid'] = pd.DataFrame(
-                    index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
-                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-                fig['ax']['grid'] = pd.DataFrame({
-                    "xi":   fig['ax']['grid']['xx'],
-                    'yi':   fig['ax']['grid']['yy'],
-                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
-                }).fillna({'PL': -0.1})
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                XI, YI = np.meshgrid(
-                    np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                     
-                )
-                fig['ax']['var'] = {
-                    'x':    XI,
-                    'y':    YI,
-                    'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin')),
-                    'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
+                # Two Method to achieve Profile Likelihood Data in Pandas! Lambda expr is more compact in code
+                # fig['var']['data'] = fig['var']['data'].assign( PL=np.exp( -0.5 * fig['var']['data'].Stat )/np.exp(-0.5 * fig['var']['BestPoint']['Stat'])  )
+                fig['var']['data'] = fig['var']['data'].assign( PL=lambda x: np.exp( -0.5 * x.Stat )/np.exp(-0.5 * fig['var']['BestPoint']['Stat'])  )
+                fig['var']['lim'] = {
+                    'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
+                    'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
                 }
-                fig['ax']['grid'] = pd.DataFrame(
-                    index=np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
-                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-                fig['ax']['grid'] = pd.DataFrame({
-                    "xi":   fig['ax']['grid']['xx'],
-                    'yi':   fig['ax']['grid']['yy'],
-                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > 10**(math.log10(tt['xx']) - 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
-                }).fillna({'PL': -0.1})
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
-                XI, YI = np.meshgrid(
-                    np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)                                       
-                )    
-                fig['ax']['var'] = {
-                    'x':    XI,
-                    'y':    YI,
-                    'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
-                    'dy':   (math.log10(fig['ax']['lim']['y'][1]) - math.log10(fig['ax']['lim']['y'][0]))/int(self.cf.get(fig['section'], 'y_nbin'))
-                }
-                fig['ax']['grid'] = pd.DataFrame(
-                    index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    columns=np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log10(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)
-                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-                fig['ax']['grid'] = pd.DataFrame({
-                    "xi":   fig['ax']['grid']['xx'],
-                    'yi':   fig['ax']['grid']['yy'],
-                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > 10**(math.log10(tt['yy']) - 0.5*fig['ax']['var']['dy'])) & (fig['var']['data'].y <10**(math.log10(tt['yy']) + 0.5*fig['ax']['var']['dy'])) ].PL.max(axis=0, skipna=True), axis=1)
-                }).fillna({'PL': -0.1})
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
-                XI, YI = np.meshgrid(
-                    np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)                                     
-                )
-                fig['ax']['var'] = {
-                    'x':    XI,
-                    'y':    YI,
-                    'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin')),
-                    'dy':   (math.log10(fig['ax']['lim']['y'][1]) - math.log10(fig['ax']['lim']['y'][0]))/int(self.cf.get(fig['section'], 'y_nbin'))
-                }
-                fig['ax']['grid'] = pd.DataFrame(
-                    index=np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                    columns=np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log10(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)
-                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-                fig['ax']['grid'] = pd.DataFrame({
-                    "xi":   fig['ax']['grid']['xx'],
-                    'yi':   fig['ax']['grid']['yy'],
-                    'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > 10**(math.log10(tt['xx']) - 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].y > 10**(math.log10(tt['yy']) - 0.5*fig['ax']['var']['dy'])) & (fig['var']['data'].y <10**(math.log10(tt['yy']) + 0.5*fig['ax']['var']['dy'])) ].PL.max(axis=0, skipna=True), axis=1)
-                }).fillna({'PL': -0.1})
-            else:
-                print("No such Mode For X,Y scale -> {},{}".format(self.cf.get(fig['section'], 'x_scale'), self.cf.get(fig['section'], 'y_scale')))
-                sys.exit(0)
-            XI, YI = np.meshgrid(
-                np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1)                
-            )
-            fig['ax']['mashgrid'] = pd.DataFrame(
-                index = np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
-                columns = np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1) 
-            ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
-            fig['ax']['mashgrid'] = pd.DataFrame({
-                'x':  fig['ax']['mashgrid']['xx'],
-                'y':  fig['ax']['mashgrid']['yy'],
-                'PL':   fig['ax']['grid']['PL']
-            })
-            self.ax_setticks(fig, 'xyc')
-
-            from matplotlib.ticker import MaxNLocator
-            levels = MaxNLocator(nbins=100).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
-            self.ax_setcmap(fig)
-            from matplotlib.tri import Triangulation, TriAnalyzer, UniformTriRefiner
-            fig['ax']['tri'] = Triangulation(fig['ax']['mashgrid']['x'], fig['ax']['mashgrid']['y'])
-            fig['ax']['refiner'] = UniformTriRefiner(fig['ax']['tri'])
-            fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'] = fig['ax']['refiner'].refine_field(fig['ax']['mashgrid']['PL'], subdiv=3)
-            fig['ax']['PL_refine'] = ( fig['ax']['PL_refine'] > 0.) * fig['ax']['PL_refine'] / (np.max(fig['ax']['PL_refine'])) + 0. * ( fig['ax']['PL_refine'] < 0.)
-
-            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data analysis completed".format(time.time()-fig['start'], fig['section']))
-
-            a1 = ax.tricontourf(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], cmap=fig['colorset']['colormap'], levels=levels, zorder=1, transform=ax.transAxes)
-            plt.colorbar(a1, axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
-            if 'curve' in fig['colorset'].keys():
-                for curve in fig['colorset']['curve']:
-                    ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve['value'])], colors=curve['linecolor'], linewidths=curve['linewidth'], zorder=(10-curve['tag'])*4, transform=ax.transAxes)
-
-                
-
-            if self.cf.has_option(fig['section'], 'BestPoint'):
-                if eval(self.cf.get(fig['section'], 'BestPoint')) and 'bestpoint' in fig['colorset'].keys():
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color=fig['colorset']['bestpoint'][0], zorder=2000)
-                    ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color=fig['colorset']['bestpoint'][1], zorder=2100)
-                    # print(fig['data'][fig['data']["chi2_h1"] == fig['var']['BestPoint']['Stat']])
-
-            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                    ax.set_xticks(fig['ax']['ticks']['x'])
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
-                ax.set_xscale('log')
-            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
-                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
-
-            if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                    ax.set_yticks(fig['ax']['ticks']['y'])
-                    ax.yaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
-                ax.set_yscale('log')
-            if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
-                ax.set_yticklabels(fig['ax']['ticks']['y'][1])
-                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                    ax.yaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
-
-            ax.tick_params(
-                labelsize=fig['colorset']['ticks']['labelsize'], 
-                direction=fig['colorset']['ticks']['direction'], 
-                bottom=fig['colorset']['ticks']['bottom'], 
-                left=fig['colorset']['ticks']['left'], 
-                top=fig['colorset']['ticks']['top'], 
-                right=fig['colorset']['ticks']['right'],
-                which='both'
-            )
-            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
-            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
-            axc.tick_params(
-                labelsize=fig['colorset']['colorticks']['labelsize'], 
-                direction=fig['colorset']['colorticks']['direction'], 
-                bottom=fig['colorset']['colorticks']['bottom'], 
-                left=fig['colorset']['colorticks']['left'], 
-                top=fig['colorset']['colorticks']['top'], 
-                right=fig['colorset']['colorticks']['right'], 
-                color=fig['colorset']['colorticks']['color']
-            )
-            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
-            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
-            axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
-            ax.xaxis.set_label_coords(0.5, -0.068)
-
-            if self.cf.has_option(fig['section'], 'Line_draw'):
-                self.drawline(fig, ax)
-            
-            if self.cf.has_option(fig['section'], "Text"):
-                self.drawtext(fig, ax)
-
-            if 'save' in self.cf.get(fig['section'], 'print_mode'):
-                from matplotlib.backends.backend_pdf import PdfPages
-                fig['fig'] = plt
-                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
-                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
-                self.compress_figure_to_PS(fig['file'])
-                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
-            if 'show' in self.cf.get(fig['section'], 'print_mode'):
-                plt.show()
-        elif fig['type'] == "2D_Scatter":
-            print("\n=== Ploting Figure : {} ===".format(fig['name']))
-            fig['start'] = time.time()
-            ax = fig['fig'].add_axes([0.13, 0.13, 0.83, 0.83])
-            self.basic_selection(fig)
-            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
-            self.Get2DData(fig)
-            # print(fig['var']['data'])
-            fig['var']['lim'] = {
-                'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
-                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()]
-            }
-            fig['ax'] = {}
-            self.ax_setlim(fig, 'xy')
-            self.ax_setcmap(fig)
-            # print(fig['colorset'])
-            if self.cf.has_option(fig['section'], 'marker'):
-                lines = self.cf.get(fig['section'], 'marker').split('\n')
-                if len(lines) == 1:
-                    marker = lines[0].split(',')
-                    if len(marker) == 2:
-                        fig['ax']['markercolor'] = marker[0].strip()
-                        fig['ax']['markertype'] = marker[1].strip()
-                        ax.scatter(
-                                fig['var']['data'].x, 
-                                fig['var']['data'].y, 
-                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
-                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
-                                s=      fig['colorset']['marker']['size'],
-                                alpha=  fig['colorset']['marker']['alpha']
-                            )
-                    elif len(marker) > 2:
-                        if marker[2].strip()[0:3] == "&Bo":
-                            fig['ax']['markercolor'] = marker[0].strip()
-                            fig['ax']['markertype'] = marker[1].strip()
-                            self.scatter_classify_data(fig, marker[2].strip()[4:])
-                            ax.scatter(
-                                fig['classify']['x'],
-                                fig['classify']['y'],
-                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
-                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
-                                s=      fig['colorset']['marker']['size'],
-                                alpha=  fig['colorset']['marker']['alpha']
-                            )
-                else:
-                    for line in lines:
-                        marker = line.split(',')
-                        if len(marker) > 2:
-                            fig['ax']['markercolor'] = marker[0].strip()
-                            fig['ax']['markertype'] = marker[1].strip()
-                            self.scatter_classify_data(fig, marker[2].strip()[4:])
-                            ax.scatter(
-                                fig['classify']['x'],
-                                fig['classify']['y'],
-                                marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
-                                c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
-                                s=      fig['colorset']['marker']['size'],
-                                alpha=  fig['colorset']['marker']['alpha']
-                            )
-            else:
-                fig['ax']['markercolor'] = 'Blue'
-                fig['ax']['markertype'] = 'round'
-                ax.scatter(
-                        fig['var']['data'].x, 
-                        fig['var']['data'].y, 
-                        marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
-                        c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
-                        s=      fig['colorset']['marker']['size'],
-                        alpha=  fig['colorset']['marker']['alpha']
+                fig['ax'] = {}
+                self.ax_setlim(fig, 'xyc')
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    XI, YI = np.meshgrid(
+                        np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                
                     )
-            self.ax_setticks(fig, 'xy')
+                    fig['ax']['var'] = {
+                        'x':    XI,
+                        'y':    YI,
+                        'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
+                        'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
+                    }
+                    fig['ax']['grid'] = pd.DataFrame(
+                        index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                    ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xi":   fig['ax']['grid']['xx'],
+                        'yi':   fig['ax']['grid']['yy'],
+                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
+                    }).fillna({'PL': -0.1})
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    XI, YI = np.meshgrid(
+                        np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)                     
+                    )
+                    fig['ax']['var'] = {
+                        'x':    XI,
+                        'y':    YI,
+                        'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin')),
+                        'dy':   (fig['ax']['lim']['y'][1] - fig['ax']['lim']['y'][0])/int(self.cf.get(fig['section'], 'y_nbin'))
+                    }
+                    fig['ax']['grid'] = pd.DataFrame(
+                        index=np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        columns=np.linspace(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1], int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                    ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xi":   fig['ax']['grid']['xx'],
+                        'yi':   fig['ax']['grid']['yy'],
+                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > 10**(math.log10(tt['xx']) - 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].y > tt['yy'] - 0.5*fig['ax']['var']['dy']) & (fig['var']['data'].y < tt['yy'] + 0.5*fig['ax']['var']['dy']) ].PL.max(axis=0, skipna=True), axis=1)
+                    }).fillna({'PL': -0.1})
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                    XI, YI = np.meshgrid(
+                        np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)                                       
+                    )    
+                    fig['ax']['var'] = {
+                        'x':    XI,
+                        'y':    YI,
+                        'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin')),
+                        'dy':   (math.log10(fig['ax']['lim']['y'][1]) - math.log10(fig['ax']['lim']['y'][0]))/int(self.cf.get(fig['section'], 'y_nbin'))
+                    }
+                    fig['ax']['grid'] = pd.DataFrame(
+                        index=np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        columns=np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log10(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                    ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xi":   fig['ax']['grid']['xx'],
+                        'yi':   fig['ax']['grid']['yy'],
+                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > tt['xx'] - 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) & (fig['var']['data'].y > 10**(math.log10(tt['yy']) - 0.5*fig['ax']['var']['dy'])) & (fig['var']['data'].y <10**(math.log10(tt['yy']) + 0.5*fig['ax']['var']['dy'])) ].PL.max(axis=0, skipna=True), axis=1)
+                    }).fillna({'PL': -0.1})
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log" and self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                    XI, YI = np.meshgrid(
+                        np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)                                     
+                    )
+                    fig['ax']['var'] = {
+                        'x':    XI,
+                        'y':    YI,
+                        'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin')),
+                        'dy':   (math.log10(fig['ax']['lim']['y'][1]) - math.log10(fig['ax']['lim']['y'][0]))/int(self.cf.get(fig['section'], 'y_nbin'))
+                    }
+                    fig['ax']['grid'] = pd.DataFrame(
+                        index=np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                        columns=np.logspace(math.log10(fig['ax']['lim']['y'][0]), math.log10(fig['ax']['lim']['y'][1]), int(self.cf.get(fig['section'], 'y_nbin'))+1)
+                    ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                    fig['ax']['grid'] = pd.DataFrame({
+                        "xi":   fig['ax']['grid']['xx'],
+                        'yi':   fig['ax']['grid']['yy'],
+                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x > 10**(math.log10(tt['xx']) - 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].y > 10**(math.log10(tt['yy']) - 0.5*fig['ax']['var']['dy'])) & (fig['var']['data'].y <10**(math.log10(tt['yy']) + 0.5*fig['ax']['var']['dy'])) ].PL.max(axis=0, skipna=True), axis=1)
+                    }).fillna({'PL': -0.1})
+                else:
+                    print("No such Mode For X,Y scale -> {},{}".format(self.cf.get(fig['section'], 'x_scale'), self.cf.get(fig['section'], 'y_scale')))
+                    sys.exit(0)
+                XI, YI = np.meshgrid(
+                    np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1)                
+                )
+                fig['ax']['mashgrid'] = pd.DataFrame(
+                    index = np.linspace(0., 1., int(self.cf.get(fig['section'], 'x_nbin'))+1),
+                    columns = np.linspace(0., 1., int(self.cf.get(fig['section'], 'y_nbin'))+1) 
+                ).unstack().reset_index().rename(columns={'level_0':'yy','level_1':'xx',0:'z'})
+                fig['ax']['mashgrid'] = pd.DataFrame({
+                    'x':  fig['ax']['mashgrid']['xx'],
+                    'y':  fig['ax']['mashgrid']['yy'],
+                    'PL':   fig['ax']['grid']['PL']
+                })
+                self.ax_setticks(fig, 'xyc')
 
-            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                    ax.set_xticks(fig['ax']['ticks']['x'])
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
-                ax.set_xscale('log')
-            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                from matplotlib.ticker import MaxNLocator
+                levels = MaxNLocator(nbins=100).tick_values(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
+                self.ax_setcmap(fig)
+                from matplotlib.tri import Triangulation, TriAnalyzer, UniformTriRefiner
+                fig['ax']['tri'] = Triangulation(fig['ax']['mashgrid']['x'], fig['ax']['mashgrid']['y'])
+                fig['ax']['refiner'] = UniformTriRefiner(fig['ax']['tri'])
+                fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'] = fig['ax']['refiner'].refine_field(fig['ax']['mashgrid']['PL'], subdiv=3)
+                fig['ax']['PL_refine'] = ( fig['ax']['PL_refine'] > 0.) * fig['ax']['PL_refine'] / (np.max(fig['ax']['PL_refine'])) + 0. * ( fig['ax']['PL_refine'] < 0.)
+
+                print("\tTimer: {:.2f} Second;  Message from '{}' -> Data analysis completed".format(time.time()-fig['start'], fig['section']))
+
+                a1 = ax.tricontourf(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], cmap=fig['colorset']['colormap'], levels=levels, zorder=1, transform=ax.transAxes)
+                plt.colorbar(a1, axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
+                if 'curve' in fig['colorset'].keys():
+                    for curve in fig['colorset']['curve']:
+                        ct = ax.tricontour(fig['ax']['tri_refine_PL'], fig['ax']['PL_refine'], [math.exp(-0.5 * curve['value'])], colors=curve['linecolor'], linewidths=curve['linewidth'], zorder=(10-curve['tag'])*4, transform=ax.transAxes)
+
+
+
+                if self.cf.has_option(fig['section'], 'BestPoint'):
+                    if eval(self.cf.get(fig['section'], 'BestPoint')) and 'bestpoint' in fig['colorset'].keys():
+                        ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 300, marker='*', color=fig['colorset']['bestpoint'][0], zorder=2000)
+                        ax.scatter(fig['var']['BestPoint']['x'], fig['var']['BestPoint']['y'], 50, marker='*', color=fig['colorset']['bestpoint'][1], zorder=2100)
+                        # print(fig['data'][fig['data']["chi2_h1"] == fig['var']['BestPoint']['Stat']])
+
                 if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+                    if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                        ax.set_xticks(fig['ax']['ticks']['x'])
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                    ax.set_xscale('log')
+                if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                    ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                    if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
+                ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
 
-            if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                    ax.set_yticks(fig['ax']['ticks']['y'])
-                    ax.yaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
-                ax.set_yscale('log')
-            if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
-                ax.set_yticklabels(fig['ax']['ticks']['y'][1])
                 if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                    ax.yaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
+                    if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                        ax.set_yticks(fig['ax']['ticks']['y'])
+                        ax.yaxis.set_minor_locator(AutoMinorLocator())
+                elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                    ax.set_yscale('log')
+                if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                    ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                    ax.set_yticklabels(fig['ax']['ticks']['y'][1])
+                    if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                        ax.yaxis.set_minor_locator(AutoMinorLocator())
+                ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
 
-            ax.tick_params(
-                labelsize=fig['colorset']['ticks']['labelsize'], 
-                direction=fig['colorset']['ticks']['direction'], 
-                bottom=fig['colorset']['ticks']['bottom'], 
-                left=fig['colorset']['ticks']['left'], 
-                top=fig['colorset']['ticks']['top'], 
-                right=fig['colorset']['ticks']['right'],
-                which='both'
-            )
-            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
-            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
-            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
-            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
-            ax.xaxis.set_label_coords(0.5, -0.068)
-            
-            if self.cf.has_option(fig['section'], 'Line_draw'):
-                self.drawline(fig, ax)
-            
-            if self.cf.has_option(fig['section'], "Text"):
-                self.drawtext(fig, ax)
+                ax.tick_params(
+                    labelsize=fig['colorset']['ticks']['labelsize'], 
+                    direction=fig['colorset']['ticks']['direction'], 
+                    bottom=fig['colorset']['ticks']['bottom'], 
+                    left=fig['colorset']['ticks']['left'], 
+                    top=fig['colorset']['ticks']['top'], 
+                    right=fig['colorset']['ticks']['right'],
+                    which='both'
+                )
+                ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+                ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+                axc.tick_params(
+                    labelsize=fig['colorset']['colorticks']['labelsize'], 
+                    direction=fig['colorset']['colorticks']['direction'], 
+                    bottom=fig['colorset']['colorticks']['bottom'], 
+                    left=fig['colorset']['colorticks']['left'], 
+                    top=fig['colorset']['colorticks']['top'], 
+                    right=fig['colorset']['colorticks']['right'], 
+                    color=fig['colorset']['colorticks']['color']
+                )
+                ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+                ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
+                axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
+                ax.xaxis.set_label_coords(0.5, -0.068)
 
-            if 'save' in self.cf.get(fig['section'], 'print_mode'):
-                from matplotlib.backends.backend_pdf import PdfPages
-                fig['fig'] = plt
-                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
-                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
-                # self.compress_figure_to_PS(fig['file'])
-                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
-            if 'show' in self.cf.get(fig['section'], 'print_mode'):
-                plt.show()
-        elif fig['type'] == "2DC_Scatter":
-            print("\n=== Ploting Figure : {} ===".format(fig['name']))
-            fig['start'] = time.time()
-            ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
-            axc = fig['fig'].add_axes([0.875, 0.13, 0.015, 0.83])
-            self.basic_selection(fig)
-            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
-            self.Get3DData(fig)
-            fig['var']['lim'] = {
-                'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
-                'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
-                'c': [fig['var']['data'].c.min(), fig['var']['data'].c.max()]
-            }
-            fig['ax'] = {}
-            self.ax_setlim(fig, 'xyc')
-            self.ax_setcmap(fig)
+                if self.cf.has_option(fig['section'], 'Line_draw'):
+                    self.drawline(fig, ax)
 
-            fig['ax']['a1'] = []
-            if self.cf.has_option(fig['section'], 'marker'):
-                lines = self.cf.get(fig['section'], 'marker').split('\n')
+                if self.cf.has_option(fig['section'], "Text"):
+                    self.drawtext(fig, ax)
+
+                if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                    fig['fig'] = plt
+                    fig['file'] = os.path.join(self.figpath, fig['name'])
+                    self.savefig(fig, plt)
+                if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                    plt.show()
+            elif fig['type'] == "2D_Scatter":
+                ax = fig['fig'].add_axes([0.13, 0.13, 0.83, 0.83])
+                print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
+                self.Get2DData(fig)
+                # print(fig['var']['data'])
+                fig['var']['lim'] = {
+                    'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
+                    'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()]
+                }
+                fig['ax'] = {}
+                self.ax_setlim(fig, 'xy')
+                self.ax_setcmap(fig)
+                # print(fig['colorset'])
+                if self.cf.has_option(fig['section'], 'marker'):
+                    lines = self.cf.get(fig['section'], 'marker').split('\n')
+                    if len(lines) == 1:
+                        marker = lines[0].split(',')
+                        if len(marker) == 2:
+                            fig['ax']['markercolor'] = marker[0].strip()
+                            fig['ax']['markertype'] = marker[1].strip()
+                            ax.scatter(
+                                    fig['var']['data'].x, 
+                                    fig['var']['data'].y, 
+                                    marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                    c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                    s=      fig['colorset']['marker']['size'],
+                                    alpha=  fig['colorset']['marker']['alpha']
+                                )
+                        elif len(marker) > 2:
+                            if marker[2].strip()[0:3] == "&Bo":
+                                fig['ax']['markercolor'] = marker[0].strip()
+                                fig['ax']['markertype'] = marker[1].strip()
+                                self.scatter_classify_data(fig, marker[2].strip()[4:])
+                                ax.scatter(
+                                    fig['classify']['x'],
+                                    fig['classify']['y'],
+                                    marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                    c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                    s=      fig['colorset']['marker']['size'],
+                                    alpha=  fig['colorset']['marker']['alpha']
+                                )
+                    else:
+                        for line in lines:
+                            marker = line.split(',')
+                            if len(marker) > 2:
+                                fig['ax']['markercolor'] = marker[0].strip()
+                                fig['ax']['markertype'] = marker[1].strip()
+                                self.scatter_classify_data(fig, marker[2].strip()[4:])
+                                ax.scatter(
+                                    fig['classify']['x'],
+                                    fig['classify']['y'],
+                                    marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                                    c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                                    s=      fig['colorset']['marker']['size'],
+                                    alpha=  fig['colorset']['marker']['alpha']
+                                )
+                else:
+                    fig['ax']['markercolor'] = 'Blue'
+                    fig['ax']['markertype'] = 'round'
+                    ax.scatter(
+                            fig['var']['data'].x, 
+                            fig['var']['data'].y, 
+                            marker= fig['colorset']['scattermarker'][fig['ax']['markertype']],
+                            c=      fig['colorset']['scattercolor'][fig['ax']['markercolor']],
+                            s=      fig['colorset']['marker']['size'],
+                            alpha=  fig['colorset']['marker']['alpha']
+                        )
+                self.ax_setticks(fig, 'xy')
+
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                        ax.set_xticks(fig['ax']['ticks']['x'])
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                    ax.set_xscale('log')
+                if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                    ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                    if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
+                ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+
+                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                        ax.set_yticks(fig['ax']['ticks']['y'])
+                        ax.yaxis.set_minor_locator(AutoMinorLocator())
+                elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                    ax.set_yscale('log')
+                if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                    ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                    ax.set_yticklabels(fig['ax']['ticks']['y'][1])
+                    if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                        ax.yaxis.set_minor_locator(AutoMinorLocator())
+                ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
+
+                ax.tick_params(
+                    labelsize=fig['colorset']['ticks']['labelsize'], 
+                    direction=fig['colorset']['ticks']['direction'], 
+                    bottom=fig['colorset']['ticks']['bottom'], 
+                    left=fig['colorset']['ticks']['left'], 
+                    top=fig['colorset']['ticks']['top'], 
+                    right=fig['colorset']['ticks']['right'],
+                    which='both'
+                )
+                ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+                ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+                ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+                ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
+                ax.xaxis.set_label_coords(0.5, -0.068)
+
+                if self.cf.has_option(fig['section'], 'Line_draw'):
+                    self.drawline(fig, ax)
+
+                if self.cf.has_option(fig['section'], "Text"):
+                    self.drawtext(fig, ax)
+
+                if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                    fig['fig'] = plt
+                    fig['file'] = os.path.join(self.figpath, fig['name'])
+                    self.savefig(fig, plt)
+                if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                    plt.show()
+            elif fig['type'] == "2DC_Scatter":
+                ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
+                axc = fig['fig'].add_axes([0.875, 0.13, 0.015, 0.83])
+                print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
+                self.Get3DData(fig)
+                fig['var']['lim'] = {
+                    'x': [fig['var']['data'].x.min(), fig['var']['data'].x.max()],
+                    'y': [fig['var']['data'].y.min(), fig['var']['data'].y.max()],
+                    'c': [fig['var']['data'].c.min(), fig['var']['data'].c.max()]
+                }
+                fig['ax'] = {}
+                self.ax_setlim(fig, 'xyc')
+                self.ax_setcmap(fig)
+
+                fig['ax']['a1'] = []
+                if self.cf.has_option(fig['section'], 'marker'):
+                    lines = self.cf.get(fig['section'], 'marker').split('\n')
                 for line in lines:
                     marker = line.split(',')
                     if marker[0].strip() == "&Color":
@@ -498,325 +494,344 @@ class Figure():
                                     alpha=  fig['colorset']['marker']['alpha']
                                 )  
 
-            self.ax_setticks(fig, 'xyc')
-            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                    ax.set_xticks(fig['ax']['ticks']['x'])
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
-                ax.set_xscale('log')
-            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                self.ax_setticks(fig, 'xyc')
                 if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
-
-            if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                    ax.set_yticks(fig['ax']['ticks']['y'])
-                    ax.yaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
-                ax.set_yscale('log')
-            if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
-                ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
-                ax.set_yticklabels(fig['ax']['ticks']['y'][1])
-                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
-                    ax.yaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
-                        
-            
-            if self.cf.has_option(fig['section'], 'c_scale'):
-                if self.cf.get(fig['section'], 'c_scale').strip().lower() == 'log':
-                    from matplotlib.colors import LogNorm
-                    plt.colorbar(fig['ax']['a1'][0], axc, norm=LogNorm(fig['var']['lim']['c'][0], fig['var']['lim']['c'][1]), orientation='vertical', extend='neither')
-                elif self.cf.get(fig['section'], 'c_scale').strip().lower() == "flat":
-                    plt.colorbar(fig['ax']['a1'][0], axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
-            # axc.set_ylim(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
-            
-
-            ax.tick_params(
-                labelsize=fig['colorset']['ticks']['labelsize'], 
-                direction=fig['colorset']['ticks']['direction'], 
-                bottom=fig['colorset']['ticks']['bottom'], 
-                left=fig['colorset']['ticks']['left'], 
-                top=fig['colorset']['ticks']['top'], 
-                right=fig['colorset']['ticks']['right'],
-                which='both'
-            )
-            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
-            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
-            axc.tick_params(
-                labelsize=fig['colorset']['colorticks']['labelsize'], 
-                direction=fig['colorset']['colorticks']['direction'], 
-                bottom=fig['colorset']['colorticks']['bottom'], 
-                left=fig['colorset']['colorticks']['left'], 
-                top=fig['colorset']['colorticks']['top'], 
-                right=fig['colorset']['colorticks']['right'], 
-                color=fig['colorset']['colorticks']['color']
-            )
-            # axc.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
-
-            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
-            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
-            axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
-            ax.xaxis.set_label_coords(0.5, -0.068)
-
-            if self.cf.has_option(fig['section'], 'Line_draw'):
-                self.drawline(fig, ax)
-            
-            if self.cf.has_option(fig['section'], "Text"):
-                self.drawtext(fig, ax)
-
-            if 'save' in self.cf.get(fig['section'], 'print_mode'):
-                from matplotlib.backends.backend_pdf import PdfPages
-                fig['fig'] = plt
-                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
-                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
-                self.compress_figure_to_PS(fig['file'])
-                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
-            if 'show' in self.cf.get(fig['section'], 'print_mode'):
-                plt.show()
-        elif fig['type'] == "1D_Stat":
-            print("\n=== Ploting Figure : {} ===".format(fig['name']))
-            fig['start'] = time.time()
-            self.basic_selection(fig)
-            print("\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']))
-            self.Get1DStatData(fig)
-            if 'x' in fig['var']['type'] and 'CHI2' in fig['var']['type'] and 'PDF' in fig['var']['type']:
-                ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
-
-                fig['var']['BestPoint'] = {
-                    'x':    fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].x,
-                    'CHI2': fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].CHI2, 
-                    'PDF':  fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].PDF
-                }
-                fig['var']['data'] = fig['var']['data'].assign( PL=lambda x: np.exp( -0.5 * x.CHI2 )/np.exp( -0.5 * fig['var']['BestPoint']['CHI2']) )
-                fig['var']['lim'] = {
-                    'x':    [fig['var']['data'].x.min(), fig['var']['data'].x.max()]
-                }
-                fig['ax'] = {}
-                self.ax_setlim(fig, 'x')
-                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                    XXGrid = np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1)
-                    XI = np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1)
-                    fig['ax']['var'] = {
-                        'x':    XI,
-                        'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin'))
-                    }
-                    fig['ax']['grid'] = pd.DataFrame({
-                        "xx":   XI
-                    })
-                    fig['ax']['grid'] = pd.DataFrame({
-                        "xi":   fig['ax']['grid']['xx'],
-                        "xxgrid":   XXGrid,
-                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= tt['xx'] -0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) ].PL.max(axis=0, skipna=True), axis=1),
-                        'PDF':  fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= tt['xx'] -0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) ].PDF.sum(), axis=1)
-                    }).fillna({"PL": 0.0, "PDF": 0.0})
-                    from scipy.stats import gaussian_kde 
-                    # pdfkde = gaussian_kde(fig['ax']['grid'].xi, bw_method=0.03*fig['ax']['var']['dx'], weights=fig['ax']['grid'].PDF)
-                    if self.cf.has_option(fig['section'], 'pdf_kde_bw'):
-                        fig['ax']['pdf_kde_bw'] = float(self.cf.get(fig['section'], 'pdf_kde_bw'))
-                    else:
-                        fig['ax']['pdf_kde_bw'] = 'silverman'
-                    fig["ax"]["pdfkde"] = gaussian_kde(fig['ax']['grid'].xxgrid, bw_method=fig['ax']['pdf_kde_bw'], weights=fig['ax']['grid'].PDF)
-                    xgrid = np.linspace(0, 1, 10000)
-                    fig['ax']['pdfkdedata'] = pd.DataFrame({
-                        'xx':   np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], 10000),
-                        'pdf':  fig["ax"]["pdfkde"].evaluate(xgrid),
-                    })
-                    fig['var']['BestPoint']['PDF'] = fig['ax']['pdfkde'].evaluate(fig['var']['BestPoint']['x'])/fig['ax']['pdfkdedata']['pdf'].max()
-                    fig['ax']['pdfkdedata']['pdf'] = fig['ax']['pdfkdedata']['pdf']/fig['ax']['pdfkdedata']['pdf'].max()
-                    fig['ax']['pdfpara'] = {
-                        'norm':                     sum(fig['ax']['pdfkdedata'].pdf),
-                        '1sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.675),
-                        '2sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.95),
-                        'mode':                     fig['ax']['pdfkdedata'].iloc[fig['ax']['pdfkdedata'].pdf.idxmax()].xx
-                    }
-                    axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
-                    plgrid = axpl(np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], 10000))
+                    if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                        ax.set_xticks(fig['ax']['ticks']['x'])
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
                 elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
-                    XXGrid = np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1)
-                    XI = np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1)
-                    fig['ax']['var'] = {
-                        'x':    XI,
-                        'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin'))
-                    }
-                    fig['ax']['grid'] = pd.DataFrame({
-                        "xx":   XI
-                    })
-                    fig['ax']['grid'] = pd.DataFrame({
-                        "xi":   fig['ax']['grid']['xx'],
-                        "xxgrid":   XXGrid,
-                        'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= 10**(math.log10(tt['xx']) -0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) ].PL.max(axis=0, skipna=True), axis=1),
-                        'PDF':  fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= 10**(math.log10(tt['xx']) -0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) ].PDF.sum(), axis=1)
-                    }).fillna({'PL': 0.0, 'PDF': 0.0})
-                    # print(fig['ax']['grid'])
-                    from scipy.stats import gaussian_kde 
-                    # pdfkde = gaussian_kde(fig['ax']['grid'].xi, bw_method=0.03*fig['ax']['var']['dx'], weights=fig['ax']['grid'].PDF)
-                    if self.cf.has_option(fig['section'], 'pdf_kde_bw'):
-                        fig['ax']['pdf_kde_bw'] = float(self.cf.get(fig['section'], 'pdf_kde_bw'))
-                    else:
-                        fig['ax']['pdf_kde_bw'] = 'silverman'
-                    fig["ax"]["pdfkde"] = gaussian_kde(fig['ax']['grid'].xxgrid, bw_method=fig['ax']['pdf_kde_bw'], weights=fig['ax']['grid'].PDF)
-                    xgrid = np.linspace(0, 1, 10000)
-                    fig['ax']['pdfkdedata'] = pd.DataFrame({
-                        'xx':   np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), 10000), 
-                        'pdf':  fig["ax"]["pdfkde"].evaluate(xgrid),
-                    })
-
-                    fig['var']['BestPoint']['PDF'] = fig['ax']['pdfkde'].evaluate(fig['var']['BestPoint']['x'])/fig['ax']['pdfkdedata']['pdf'].max()
-                    fig['ax']['pdfkdedata']['pdf'] = fig['ax']['pdfkdedata']['pdf']/fig['ax']['pdfkdedata']['pdf'].max()
-                    fig['ax']['pdfpara'] = {
-                        'norm':                     sum(fig['ax']['pdfkdedata'].pdf),
-                        '1sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.675),
-                        '2sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.95),
-                        'mode':                     fig['ax']['pdfkdedata'].iloc[fig['ax']['pdfkdedata'].pdf.idxmax()].xx
-                    }
-                    axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
-                    plgrid = axpl(np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), 10000))
-                    ax.set_xscale("log")
-                self.ax_setcmap(fig)
-                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.09, -0.12, where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['2sigma_critical_prob'], edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5 )
-                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.09, -0.12, where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['1sigma_critical_prob'], edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'],facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'], alpha=fig['colorset']['1dpdf']['1sigma']['alpha'],zorder=6)                
-                ax.fill_between( fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'],  where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['2sigma_critical_prob'],  edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5 )
-                ax.fill_between( fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'],  where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['1sigma_critical_prob'],  edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6 )
+                    ax.set_xscale('log')
+                if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                    ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                    if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
                 ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
-                ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0, 0], '-', color='grey', linewidth=0.8, zorder=0)
-                ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0.1354, 0.1354], '--', color='#ea4702', linewidth=1.2, zorder=0)
-                ax.text(0.025, 0.237, r"$95.4\%~{\rm C.L.}$", fontsize=12, transform=ax.transAxes)
-                ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0.60583, 0.60583], '--', color='#ea4702', linewidth=1.2, zorder=0)
-                ax.text(0.025, 0.595, r"$68.3\%~{\rm C.L.}$", fontsize=12, transform=ax.transAxes)
-                ax.set_ylim(-0.16, 1.15)                 
-                if self.cf.has_option(fig['section'], "BestPoint"):
-                    for item in fig['colorset']['1dpdf']['bestpoint']:
-                        ax.plot( [fig['var']['BestPoint']['x'], fig['var']['BestPoint']['x']], [-0.069, -0.041 ], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7               )   
-                    for item in fig['colorset']['1dpdf']['pdfmode']:             
-                        ax.plot( [fig['ax']['pdfpara']['mode'], fig['ax']['pdfpara']['mode']], [0.001, 0.999 ], '-',linewidth=item['width'],color=item['color'],alpha=item['alpha'],zorder=7)
-                        ax.plot( [fig['ax']['pdfpara']['mode'], fig['ax']['pdfpara']['mode']], [-0.09, -0.12 ], '-',linewidth=item['width'],color=item['color'],alpha=item['alpha'],zorder=7 )
-                ax.fill_between(fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'], color="w", alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=1)                
-                ax.plot(fig['ax']['pdfkdedata']['xx'], fig['ax']['pdfkdedata']['pdf'], '-', linewidth = fig['colorset']['1dpdf']['line']['width'], color=fig['colorset']['1dpdf']['line']['color'], alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=10)
-                ax.fill_between( fig['ax']['grid']['xi'], 0, fig['ax']['grid']['PL'], color='red', step='mid', alpha=0.1, zorder=0 )
-                ax.step(fig['ax']['grid']['xi'],fig['ax']['grid']['PL'],color='red',where='mid',zorder=9)  
-                # axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
-                # plgrid = axpl(xgrid)
-                # ax.fill_between( fig['ax']['grid']['xi'], -0.07, -0.04, where=fig['ax']['grid']['PL']>0.1354, color='#f8a501', step='mid', alpha=0.8 )
-                # ax.fill_between( fig['ax']['grid']['xi'], -0.07, -0.04, where=fig['ax']['grid']['PL']>0.60583, color='#10a6e7', step='mid', alpha=0.7 )                
-                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.07, -0.04, where=plgrid>0.1354, color='#f8a501', step='mid', alpha=0.8 )
-                ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.07, -0.04, where=plgrid>0.60583, color='#10a6e7', step='mid', alpha=0.7 )
-            self.ax_setticks(fig, 'x')
 
-            if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                    ax.set_xticks(fig['ax']['ticks']['x'])
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
-                ax.set_xscale('log')
-            if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
-                ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
-                ax.set_xticklabels(fig['ax']['ticks']['x'][1])
-                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
-                    ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
-            ax.yaxis.set_minor_locator(FixedLocator(np.linspace(0, 1, 26)))
+                if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                    if not self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                        ax.set_yticks(fig['ax']['ticks']['y'])
+                        ax.yaxis.set_minor_locator(AutoMinorLocator())
+                elif self.cf.get(fig['section'], 'y_scale').strip().lower() == 'log':
+                    ax.set_yscale('log')
+                if self.cf.get(fig['section'], 'y_ticks')[0:4] == "Manu":
+                    ax.yaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['y'][0]))
+                    ax.set_yticklabels(fig['ax']['ticks']['y'][1])
+                    if self.cf.get(fig['section'], 'y_scale').strip().lower() == 'flat':
+                        ax.yaxis.set_minor_locator(AutoMinorLocator())
+                ax.set_ylim(fig['ax']['lim']['y'][0], fig['ax']['lim']['y'][1])
 
-            ax.tick_params( labelsize=fig['colorset']['ticks']['labelsize'],  direction=fig['colorset']['ticks']['direction'],  bottom=fig['colorset']['ticks']['bottom'],  left=fig['colorset']['ticks']['left'],  top=fig['colorset']['ticks']['top'],  right=fig['colorset']['ticks']['right'], which='both' )
-            ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
-            ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
-            ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
-            ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'chi2_label')), fontsize=30)
-            ax.xaxis.set_label_coords(0.5, -0.068)
-            plax = ax.secondary_yaxis("right")
-            plax.set_ylabel(r"{}".format(self.cf.get(fig['section'], "pdf_label")), fontsize=30)
-            plax.yaxis.set_major_locator(FixedLocator([]))
-            plax.tick_params( labelsize=3, labelcolor="None",  direction=fig['colorset']['ticks']['direction'] )
 
-            if self.cf.has_option(fig['section'], 'Line_draw'):
-                self.drawline(fig, ax)
-            
-            if self.cf.has_option(fig['section'], "Text"):
-                self.drawtext(fig, ax)
+                if self.cf.has_option(fig['section'], 'c_scale'):
+                    if self.cf.get(fig['section'], 'c_scale').strip().lower() == 'log':
+                        from matplotlib.colors import LogNorm
+                        plt.colorbar(fig['ax']['a1'][0], axc, norm=LogNorm(fig['var']['lim']['c'][0], fig['var']['lim']['c'][1]), orientation='vertical', extend='neither')
+                    elif self.cf.get(fig['section'], 'c_scale').strip().lower() == "flat":
+                        plt.colorbar(fig['ax']['a1'][0], axc, ticks=fig['ax']['ticks']['c'], orientation='vertical', extend='neither')
+                # axc.set_ylim(fig['ax']['lim']['c'][0], fig['ax']['lim']['c'][1])
 
-            if self.cf.has_option(fig['section'], "drawlegend"):
-                if eval(self.cf.get(fig['section'], "drawlegend")):
-                    print("\tTimer: {:.2f} Second;  Drawing default format legend ...".format(time.time()-fig['start']))
-                    axlegend = fig['fig'].add_axes([0.14, 0.875, 0.72, 0.07])
-                    axlegend.spines['top'].set_visible(False)
-                    axlegend.spines['bottom'].set_visible(False)
-                    axlegend.spines['left'].set_visible(False)
-                    axlegend.spines['right'].set_visible(False)
-                    axlegend.xaxis.set_major_locator(NullLocator())
-                    axlegend.yaxis.set_major_locator(NullLocator())
-                    axlegend.set_xlim(0, 100)
-                    axlegend.set_ylim(-2.5, 2)
-                    axlegend.step([2,3,5,7,9, 10], [0.5, 0.5, 1.3, 1.5, 0.2, 0.2], color='red', where='mid', zorder=0)
-                    axlegend.fill_between([2,3,5,7,9, 10], 0, [0.5, 0.5, 1.3, 1.5, 0.2, 0.2], color='red', step='mid', alpha=0.1)
-                    axlegend.text(12, 0.2, r"$\rm Profile~Likelihood$", fontsize=10.5)
-                    axlegend.fill_between([2, 10], -0.7, -2, color='#f8a501', step='mid', alpha=0.8)
-                    axlegend.fill_between([4, 8], -0.7, -2,  color='#10a6e7', step='mid', alpha=0.7)
-                    axlegend.text(12, -1.9, r"$\rm Best$-$\rm fit~point,~1\sigma~\&~2\sigma~confidence~interval$", fontsize=10.5)
-                    legendxi = np.linspace(52, 60, 100)
-                    legendyy = 1.5 * np.exp(-(legendxi-55.0)**2/2) + 0.6 * np.exp(-(legendxi-58)**2/ 1.5 )
-                    axlegend.plot(legendxi, legendyy, '-', linewidth = fig['colorset']['1dpdf']['line']['width'], color=fig['colorset']['1dpdf']['line']['color'], alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=10)
-                    axlegend.fill_between(legendxi, 0, legendyy, color='w', zorder=1)
-                    axlegend.fill_between(legendxi, 0, legendyy, where=legendyy>0.23, edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5)
-                    axlegend.fill_between(legendxi, 0, legendyy, where=legendyy>0.72, edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6)
-                    axlegend.fill_between(legendxi, -0.7, -2, where=legendyy>0.23, edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5)
-                    axlegend.fill_between(legendxi, -0.7, -2, where=legendyy>0.72, edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6)
+
+                ax.tick_params(
+                    labelsize=fig['colorset']['ticks']['labelsize'], 
+                    direction=fig['colorset']['ticks']['direction'], 
+                    bottom=fig['colorset']['ticks']['bottom'], 
+                    left=fig['colorset']['ticks']['left'], 
+                    top=fig['colorset']['ticks']['top'], 
+                    right=fig['colorset']['ticks']['right'],
+                    which='both'
+                )
+                ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+                ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+                axc.tick_params(
+                    labelsize=fig['colorset']['colorticks']['labelsize'], 
+                    direction=fig['colorset']['colorticks']['direction'], 
+                    bottom=fig['colorset']['colorticks']['bottom'], 
+                    left=fig['colorset']['colorticks']['left'], 
+                    top=fig['colorset']['colorticks']['top'], 
+                    right=fig['colorset']['colorticks']['right'], 
+                    color=fig['colorset']['colorticks']['color']
+                )
+                # axc.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+
+                ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+                ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'y_label')), fontsize=30)
+                axc.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'c_label')), fontsize=30)
+                ax.xaxis.set_label_coords(0.5, -0.068)
+
+                if self.cf.has_option(fig['section'], 'Line_draw'):
+                    self.drawline(fig, ax)
+
+                if self.cf.has_option(fig['section'], "Text"):
+                    self.drawtext(fig, ax)
+
+                if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                    # from matplotlib.backends.backend_pdf import PdfPages
+                    fig['fig'] = plt
+                    fig['file'] = os.path.join(self.figpath, fig['name'])
+                    self.savefig(fig, plt)
+                if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                    plt.show()
+            elif fig['type'] == "1D_Stat":
+                print(emoji.emojize("    :beginner:\tTimer: {:.2f} Second;  Message from '{}' -> Data loading completed".format(time.time()-fig['start'], fig['section']), use_aliases=True))
+                self.Get1DStatData(fig)
+                if 'x' in fig['var']['type'] and 'CHI2' in fig['var']['type'] and 'PDF' in fig['var']['type']:
+                    ax = fig['fig'].add_axes([0.13, 0.13, 0.74, 0.83])
+                    fig['var']['BestPoint'] = {
+                        'x':    fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].x,
+                        'CHI2': fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].CHI2, 
+                        'PDF':  fig['var']['data'].loc[fig['var']['data'].CHI2.idxmin()].PDF
+                    }
+                    fig['var']['data'] = fig['var']['data'].assign( PL=lambda x: np.exp( -0.5 * x.CHI2 )/np.exp( -0.5 * fig['var']['BestPoint']['CHI2']) )
+                    fig['var']['lim'] = {
+                        'x':    [fig['var']['data'].x.min(), fig['var']['data'].x.max()]
+                    }
+                    fig['ax'] = {}
+                    self.ax_setlim(fig, 'x')
+                    if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                        XXGrid = np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                        XI = np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                        fig['ax']['var'] = {
+                            'x':    XI,
+                            'dx':   (fig['ax']['lim']['x'][1] - fig['ax']['lim']['x'][0])/int(self.cf.get(fig['section'], 'x_nbin'))
+                        }
+                        fig['ax']['grid'] = pd.DataFrame({
+                            "xx":   XI
+                        })
+                        fig['ax']['grid'] = pd.DataFrame({
+                            "xi":   fig['ax']['grid']['xx'],
+                            "xxgrid":   XXGrid,
+                            'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= tt['xx'] -0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) ].PL.max(axis=0, skipna=True), axis=1),
+                            'PDF':  fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= tt['xx'] -0.5*fig['ax']['var']['dx']) & (fig['var']['data'].x < tt['xx'] + 0.5*fig['ax']['var']['dx']) ].PDF.sum(), axis=1)
+                        }).fillna({"PL": 0.0, "PDF": 0.0})
+                        from scipy.stats import gaussian_kde 
+                        # pdfkde = gaussian_kde(fig['ax']['grid'].xi, bw_method=0.03*fig['ax']['var']['dx'], weights=fig['ax']['grid'].PDF)
+                        if self.cf.has_option(fig['section'], 'pdf_kde_bw'):
+                            fig['ax']['pdf_kde_bw'] = float(self.cf.get(fig['section'], 'pdf_kde_bw'))
+                        else:
+                            fig['ax']['pdf_kde_bw'] = 'silverman'
+                        fig["ax"]["pdfkde"] = gaussian_kde(fig['ax']['grid'].xxgrid, bw_method=fig['ax']['pdf_kde_bw'], weights=fig['ax']['grid'].PDF)
+                        xgrid = np.linspace(0, 1, 10000)
+                        fig['ax']['pdfkdedata'] = pd.DataFrame({
+                            'xx':   np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], 10000),
+                            'pdf':  fig["ax"]["pdfkde"].evaluate(xgrid),
+                        })
+                        fig['var']['BestPoint']['PDF'] = fig['ax']['pdfkde'].evaluate(fig['var']['BestPoint']['x'])/fig['ax']['pdfkdedata']['pdf'].max()
+                        fig['ax']['pdfkdedata']['pdf'] = fig['ax']['pdfkdedata']['pdf']/fig['ax']['pdfkdedata']['pdf'].max()
+                        fig['ax']['pdfpara'] = {
+                            'norm':                     sum(fig['ax']['pdfkdedata'].pdf),
+                            '1sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.675),
+                            '2sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.95),
+                            'mode':                     fig['ax']['pdfkdedata'].iloc[fig['ax']['pdfkdedata'].pdf.idxmax()].xx
+                        }
+                        axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
+                        plgrid = axpl(np.linspace(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1], 10000))
+                    elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                        XXGrid = np.linspace(0, 1, int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                        XI = np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), int(self.cf.get(fig['section'], 'x_nbin'))+1)
+                        fig['ax']['var'] = {
+                            'x':    XI,
+                            'dx':   (math.log10(fig['ax']['lim']['x'][1]) - math.log10(fig['ax']['lim']['x'][0]))/int(self.cf.get(fig['section'], 'x_nbin'))
+                        }
+                        fig['ax']['grid'] = pd.DataFrame({
+                            "xx":   XI
+                        })
+                        fig['ax']['grid'] = pd.DataFrame({
+                            "xi":   fig['ax']['grid']['xx'],
+                            "xxgrid":   XXGrid,
+                            'PL':   fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= 10**(math.log10(tt['xx']) -0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) ].PL.max(axis=0, skipna=True), axis=1),
+                            'PDF':  fig['ax']['grid'].apply(lambda tt: fig['var']['data'][ (fig['var']['data'].x >= 10**(math.log10(tt['xx']) -0.5*fig['ax']['var']['dx'])) & (fig['var']['data'].x < 10**(math.log10(tt['xx']) + 0.5*fig['ax']['var']['dx'])) ].PDF.sum(), axis=1)
+                        }).fillna({'PL': 0.0, 'PDF': 0.0})
+                        # print(fig['ax']['grid'])
+                        from scipy.stats import gaussian_kde 
+                        # pdfkde = gaussian_kde(fig['ax']['grid'].xi, bw_method=0.03*fig['ax']['var']['dx'], weights=fig['ax']['grid'].PDF)
+                        if self.cf.has_option(fig['section'], 'pdf_kde_bw'):
+                            fig['ax']['pdf_kde_bw'] = float(self.cf.get(fig['section'], 'pdf_kde_bw'))
+                        else:
+                            fig['ax']['pdf_kde_bw'] = 'silverman'
+                        fig["ax"]["pdfkde"] = gaussian_kde(fig['ax']['grid'].xxgrid, bw_method=fig['ax']['pdf_kde_bw'], weights=fig['ax']['grid'].PDF)
+                        xgrid = np.linspace(0, 1, 10000)
+                        fig['ax']['pdfkdedata'] = pd.DataFrame({
+                            'xx':   np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), 10000), 
+                            'pdf':  fig["ax"]["pdfkde"].evaluate(xgrid),
+                        })
+
+                        fig['var']['BestPoint']['PDF'] = fig['ax']['pdfkde'].evaluate(fig['var']['BestPoint']['x'])/fig['ax']['pdfkdedata']['pdf'].max()
+                        fig['ax']['pdfkdedata']['pdf'] = fig['ax']['pdfkdedata']['pdf']/fig['ax']['pdfkdedata']['pdf'].max()
+                        fig['ax']['pdfpara'] = {
+                            'norm':                     sum(fig['ax']['pdfkdedata'].pdf),
+                            '1sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.675),
+                            '2sigma_critical_prob':     self.find_critical_prob(fig['ax']['pdfkdedata'], 0.95),
+                            'mode':                     fig['ax']['pdfkdedata'].iloc[fig['ax']['pdfkdedata'].pdf.idxmax()].xx
+                        }
+                        axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
+                        plgrid = axpl(np.logspace(math.log10(fig['ax']['lim']['x'][0]), math.log10(fig['ax']['lim']['x'][1]), 10000))
+                        ax.set_xscale("log")
+                    self.ax_setcmap(fig)
+                    ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.09, -0.12, where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['2sigma_critical_prob'], edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5 )
+                    ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.09, -0.12, where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['1sigma_critical_prob'], edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'],facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'], alpha=fig['colorset']['1dpdf']['1sigma']['alpha'],zorder=6)                
+                    ax.fill_between( fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'],  where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['2sigma_critical_prob'],  edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5 )
+                    ax.fill_between( fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'],  where=fig['ax']['pdfkdedata']['pdf'] > fig['ax']['pdfpara']['1sigma_critical_prob'],  edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6 )
+                    ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+                    ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0, 0], '-', color='grey', linewidth=0.8, zorder=0)
+                    ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0.1354, 0.1354], '--', color='#ea4702', linewidth=1.2, zorder=0)
+                    ax.text(0.025, 0.237, r"$95.4\%~{\rm C.L.}$", fontsize=12, transform=ax.transAxes)
+                    ax.plot([fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1]], [0.60583, 0.60583], '--', color='#ea4702', linewidth=1.2, zorder=0)
+                    ax.text(0.025, 0.595, r"$68.3\%~{\rm C.L.}$", fontsize=12, transform=ax.transAxes)
+                    ax.set_ylim(-0.16, 1.15)                 
                     if self.cf.has_option(fig['section'], "BestPoint"):
-                        for item in fig['colorset']['1dpdf']['pdfmode']:
-                            axlegend.plot( [55.0, 55.0], [0.05, 1.45 ], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7)
-                            axlegend.plot( [55.0, 55.0], [-0.8, -1.95], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7)  
                         for item in fig['colorset']['1dpdf']['bestpoint']:
-                            axlegend.plot( [7.0, 7.0], [-0.8, -1.95], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7 )
-                    axlegend.text(62, 0.2, r"$\rm Posterior~PDF$", fontsize=10.5)
-                    axlegend.text(62, -1.9, r"$\rm PDF~mode, ~1\sigma~\&~2\sigma~credible~region$", fontsize=10.5)
+                            ax.plot( [fig['var']['BestPoint']['x'], fig['var']['BestPoint']['x']], [-0.069, -0.041 ], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7               )   
+                        for item in fig['colorset']['1dpdf']['pdfmode']:             
+                            ax.plot( [fig['ax']['pdfpara']['mode'], fig['ax']['pdfpara']['mode']], [0.001, 0.999 ], '-',linewidth=item['width'],color=item['color'],alpha=item['alpha'],zorder=7)
+                            ax.plot( [fig['ax']['pdfpara']['mode'], fig['ax']['pdfpara']['mode']], [-0.09, -0.12 ], '-',linewidth=item['width'],color=item['color'],alpha=item['alpha'],zorder=7 )
+                    ax.fill_between(fig['ax']['pdfkdedata']['xx'], 0, fig['ax']['pdfkdedata']['pdf'], color="w", alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=1)                
+                    ax.plot(fig['ax']['pdfkdedata']['xx'], fig['ax']['pdfkdedata']['pdf'], '-', linewidth = fig['colorset']['1dpdf']['line']['width'], color=fig['colorset']['1dpdf']['line']['color'], alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=10)
+                    ax.fill_between( fig['ax']['grid']['xi'], 0, fig['ax']['grid']['PL'], color='red', step='mid', alpha=0.1, zorder=0 )
+                    ax.step(fig['ax']['grid']['xi'],fig['ax']['grid']['PL'],color='red',where='mid',zorder=9)  
+                    # axpl = interp1d(fig['ax']['grid']['xi'], fig['ax']['grid']['PL'], kind='linear')
+                    # plgrid = axpl(xgrid)
+                    # ax.fill_between( fig['ax']['grid']['xi'], -0.07, -0.04, where=fig['ax']['grid']['PL']>0.1354, color='#f8a501', step='mid', alpha=0.8 )
+                    # ax.fill_between( fig['ax']['grid']['xi'], -0.07, -0.04, where=fig['ax']['grid']['PL']>0.60583, color='#10a6e7', step='mid', alpha=0.7 )                
+                    ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.07, -0.04, where=plgrid>0.1354, color='#f8a501', step='mid', alpha=0.8 )
+                    ax.fill_between( fig['ax']['pdfkdedata']['xx'], -0.07, -0.04, where=plgrid>0.60583, color='#10a6e7', step='mid', alpha=0.7 )
+                self.ax_setticks(fig, 'x')
 
-            if 'save' in self.cf.get(fig['section'], 'print_mode'):
-                from matplotlib.backends.backend_pdf import PdfPages
-                fig['fig'] = plt
-                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
-                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
+                if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                    if not self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                        ax.set_xticks(fig['ax']['ticks']['x'])
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
+                elif self.cf.get(fig['section'], 'x_scale').strip().lower() == "log":
+                    ax.set_xscale('log')
+                if self.cf.get(fig['section'], 'x_ticks')[0:4] == 'Manu':
+                    ax.xaxis.set_major_locator(ticker.FixedLocator(fig['ax']['ticks']['x'][0]))
+                    ax.set_xticklabels(fig['ax']['ticks']['x'][1])
+                    if self.cf.get(fig['section'], 'x_scale').strip().lower() == "flat":
+                        ax.xaxis.set_minor_locator(AutoMinorLocator())
+                ax.set_xlim(fig['ax']['lim']['x'][0], fig['ax']['lim']['x'][1])
+                ax.yaxis.set_minor_locator(FixedLocator(np.linspace(0, 1, 26)))
+
+                ax.tick_params( labelsize=fig['colorset']['ticks']['labelsize'],  direction=fig['colorset']['ticks']['direction'],  bottom=fig['colorset']['ticks']['bottom'],  left=fig['colorset']['ticks']['left'],  top=fig['colorset']['ticks']['top'],  right=fig['colorset']['ticks']['right'], which='both' )
+                ax.tick_params(which='major', length=fig['colorset']['ticks']['majorlength'], color=fig['colorset']['ticks']['majorcolor'])
+                ax.tick_params(which='minor', length=fig['colorset']['ticks']['minorlength'], color=fig['colorset']['ticks']['minorcolor'])
+                ax.set_xlabel(r"{}".format(self.cf.get(fig['section'], 'x_label')), fontsize=30)
+                ax.set_ylabel(r"{}".format(self.cf.get(fig['section'], 'chi2_label')), fontsize=30)
+                ax.xaxis.set_label_coords(0.5, -0.068)
+                plax = ax.secondary_yaxis("right")
+                plax.set_ylabel(r"{}".format(self.cf.get(fig['section'], "pdf_label")), fontsize=30)
+                plax.yaxis.set_major_locator(FixedLocator([]))
+                plax.tick_params( labelsize=3, labelcolor="None",  direction=fig['colorset']['ticks']['direction'] )
+
+                if self.cf.has_option(fig['section'], 'Line_draw'):
+                    self.drawline(fig, ax)
+
+                if self.cf.has_option(fig['section'], "Text"):
+                    self.drawtext(fig, ax)
+
+                if self.cf.has_option(fig['section'], "drawlegend"):
+                    if eval(self.cf.get(fig['section'], "drawlegend")):
+                        print("\tTimer: {:.2f} Second;  Drawing default format legend ...".format(time.time()-fig['start']))
+                        axlegend = fig['fig'].add_axes([0.14, 0.875, 0.72, 0.07])
+                        axlegend.spines['top'].set_visible(False)
+                        axlegend.spines['bottom'].set_visible(False)
+                        axlegend.spines['left'].set_visible(False)
+                        axlegend.spines['right'].set_visible(False)
+                        axlegend.xaxis.set_major_locator(NullLocator())
+                        axlegend.yaxis.set_major_locator(NullLocator())
+                        axlegend.set_xlim(0, 100)
+                        axlegend.set_ylim(-2.5, 2)
+                        axlegend.step([2,3,5,7,9, 10], [0.5, 0.5, 1.3, 1.5, 0.2, 0.2], color='red', where='mid', zorder=0)
+                        axlegend.fill_between([2,3,5,7,9, 10], 0, [0.5, 0.5, 1.3, 1.5, 0.2, 0.2], color='red', step='mid', alpha=0.1)
+                        axlegend.text(12, 0.2, r"$\rm Profile~Likelihood$", fontsize=10.5)
+                        axlegend.fill_between([2, 10], -0.7, -2, color='#f8a501', step='mid', alpha=0.8)
+                        axlegend.fill_between([4, 8], -0.7, -2,  color='#10a6e7', step='mid', alpha=0.7)
+                        axlegend.text(12, -1.9, r"$\rm Best$-$\rm fit~point,~1\sigma~\&~2\sigma~confidence~interval$", fontsize=10.5)
+                        legendxi = np.linspace(52, 60, 100)
+                        legendyy = 1.5 * np.exp(-(legendxi-55.0)**2/2) + 0.6 * np.exp(-(legendxi-58)**2/ 1.5 )
+                        axlegend.plot(legendxi, legendyy, '-', linewidth = fig['colorset']['1dpdf']['line']['width'], color=fig['colorset']['1dpdf']['line']['color'], alpha=fig['colorset']['1dpdf']['line']['alpha'],zorder=10)
+                        axlegend.fill_between(legendxi, 0, legendyy, color='w', zorder=1)
+                        axlegend.fill_between(legendxi, 0, legendyy, where=legendyy>0.23, edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5)
+                        axlegend.fill_between(legendxi, 0, legendyy, where=legendyy>0.72, edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6)
+                        axlegend.fill_between(legendxi, -0.7, -2, where=legendyy>0.23, edgecolor=fig['colorset']['1dpdf']['2sigma']['edge'], facecolor=fig['colorset']['1dpdf']['2sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['2sigma']['alpha'], zorder=5)
+                        axlegend.fill_between(legendxi, -0.7, -2, where=legendyy>0.72, edgecolor=fig['colorset']['1dpdf']['1sigma']['edge'], facecolor=fig['colorset']['1dpdf']['1sigma']['facecolor'],  alpha=fig['colorset']['1dpdf']['1sigma']['alpha'], zorder=6)
+                        if self.cf.has_option(fig['section'], "BestPoint"):
+                            for item in fig['colorset']['1dpdf']['pdfmode']:
+                                axlegend.plot( [55.0, 55.0], [0.05, 1.45 ], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7)
+                                axlegend.plot( [55.0, 55.0], [-0.8, -1.95], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7)  
+                            for item in fig['colorset']['1dpdf']['bestpoint']:
+                                axlegend.plot( [7.0, 7.0], [-0.8, -1.95], '-', linewidth=item['width'], color=item['color'], alpha=item['alpha'], zorder=7 )
+                        axlegend.text(62, 0.2, r"$\rm Posterior~PDF$", fontsize=10.5)
+                        axlegend.text(62, -1.9, r"$\rm PDF~mode, ~1\sigma~\&~2\sigma~credible~region$", fontsize=10.5)
+
+                if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                    fig['fig'] = plt
+                    fig['file'] = os.path.join(self.figpath, fig['name'])
+                    self.savefig(fig, plt)
+                if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                    plt.show()
+            elif fig['type'] == "TernaryRGB_Scatter":
+                self.load_ternary_configure(fig, "TernaryRGB")
+                self.makecanvas(fig)
+                self.init_ternary(fig, 'axt')
+                self.init_ternary(fig, 'axr')
+                self.init_ternary(fig, 'axg')
+                self.init_ternary(fig, 'axb')
+
+                self.getTernaryRGBData(fig)
+                fig['ax']['axt'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['c'], s=5, zorder=1, alpha=1)
+                fig['ax']['axr'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['r'], s=1, zorder=1, alpha=0.8)
+                fig['ax']['axg'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['g'], s=1, zorder=1, alpha=0.8)
+                fig['ax']['axb'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['b'], s=1.5, zorder=1, alpha=1)
+
+                self.set_Ternary_label(fig, 'axt')
+
+                if 'save' in self.cf.get(fig['section'], 'print_mode'):
+                    fig['fig'] = plt
+                    fig['file'] = os.path.join(self.figpath, fig['name'])
+                    self.savefig(fig, plt)
+                if 'show' in self.cf.get(fig['section'], 'print_mode'):
+                    plt.show()
+            elif fig['type'] == "Ternary_Scatter":
+                self.load_ternary_configure(fig, "Ternary_Default")
+                self.makecanvas(fig)
+
+    def savefig(self, fig, plt):
+        from matplotlib.backends.backend_pdf import PdfPages
+        support_fmt_list = ['ps', 'eps', 'pdf', 'pgf', 'png', 'raw', 'rgba', 'svg', 'svgz', 'jpg', 'jpeg', 'tif', 'tiff']
+        if self.cf.has_option("PLOT_CONFI", 'save_format'):
+            save_format = self.cf.get("PLOT_CONFI", 'save_format').split(",")
+        else:
+            save_format = ['pdf']
+        unsupport = []
+        support = []
+        file_list = []
+        for fmt in save_format:
+            if fmt.strip().lower() in support_fmt_list:
+                support.append(fmt.strip().lower())
+                file_list.append("'{}.{}'".format(fig['name'], fmt.strip().lower()))
+            else:
+                unsupport.append("'*.{}'".format(fmt.strip().lower()))
+        if len(support) == 0:
+            support = ['pdf']
+            file_list = ["'{}.{}'".format(fig['name'], 'pdf')]
+            print("\tTimer: {:.2f} Second;  Message from '{}' -> No support picture format found in configure file! Default format '*.pdf' used in this plot".format(time.time()-fig['start'], fig['section']))
+        for fmt in support:
+            if (fmt == 'ps'):
+                pp = plt
+                pp.savefig("{}.pdf".format(fig['file']), format='pdf')
                 self.compress_figure_to_PS(fig['file'])
-                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
-            if 'show' in self.cf.get(fig['section'], 'print_mode'):
-                plt.show()
+            elif fmt == "pdf" and ('ps' not in save_format):
+                pp = plt
+                pp.savefig("{}.{}".format(fig['file'], fmt))
+            else:
+                pp = plt
+                pp.savefig("{}.{}".format(fig['file'], fmt), dpi=300)
 
-
-
-        elif fig['type'] == "TernaryRGB_Scatter":
-            print("\n=== Ploting Figure : {} ===".format(fig['name']))
-            fig['start'] = time.time()
-            self.load_ternary_configure(fig, "TernaryRGB")
-            self.makecanvas(fig)
-            self.init_ternary(fig, 'axt')
-            self.init_ternary(fig, 'axr')
-            self.init_ternary(fig, 'axg')
-            self.init_ternary(fig, 'axb')
-
-            self.basic_selection(fig)
-            self.getTernaryRGBData(fig)
-            fig['ax']['axt'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['c'], s=5, zorder=1, alpha=1)
-            fig['ax']['axr'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['r'], s=1, zorder=1, alpha=0.8)
-            fig['ax']['axg'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['g'], s=1, zorder=1, alpha=0.8)
-            fig['ax']['axb'].scatter(fig['var']['axdata']['x'], fig['var']['axdata']['y'], marker='^', color=fig['var']['axdata']['b'], s=1.5, zorder=1, alpha=1)
-
-            self.set_Ternary_label(fig, 'axt')
-
-            if 'save' in self.cf.get(fig['section'], 'print_mode'):
-                from matplotlib.backends.backend_pdf import PdfPages
-                fig['fig'] = plt
-                fig['file'] = "{}/{}".format(self.figpath, fig['name'])
-                fig['fig'].savefig("{}.pdf".format(fig['file']), format='pdf')
-                self.compress_figure_to_PS(fig['file'])
-                print("\tTimer: {:.2f} Second;  Figure {} saved as {}".format(time.time()-fig['start'], fig['name'], "{}/{}.pdf".format(self.figpath, fig['name'])))
-            if 'show' in self.cf.get(fig['section'], 'print_mode'):
-                plt.show()
-        elif fig['type'] == "Ternary_Scatter":
-            print("\n=== Ploting Figure : {} ===".format(fig['name']))
-            fig['start'] = time.time()
-            self.load_ternary_configure(fig, "Ternary_Default")
-            self.makecanvas(fig)
+        if ('pdf' not in support) and ('ps' in support):
+            os.remove("{}.pdf".format(fig['file']))
+        
+        print("\tTimer: {:.2f} Second;  Figure {} saved in the path\n\t\t {} -> {}".format(time.time()-fig['start'], fig['name'], self.figpath, ",\t".join(file_list)))
+        if unsupport:
+            print(emoji.emojize('\t:ghost::ghost::ghost: Figure format unsupport -> {}. '.format(", ".join(unsupport)), use_aliases=True))
 
 
     def find_critical_prob(self, data, prob):
@@ -1010,7 +1025,7 @@ class Figure():
                 fig['classify']['c'] = fig['classify']['data'][c_info]
 
     def get_Linestyle(self, style):
-        style_file = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get("COLORMAP", "StyleSetting"))
+        style_file = os.path.join(pwd, self.cf.get("COLORMAP", "StyleSetting"))
         style = style.strip()
         if (not style[0] == '&') or (not os.path.exists(style_file)):
             print("\tLine info Error: Unvaliable line format {} \n\t Default Line Format used".format(style))
@@ -1133,7 +1148,7 @@ class Figure():
             draw(get_line_info(line))
 
     def get_TextStyle(self, style):
-        style_file = os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get("COLORMAP", "StyleSetting"))
+        style_file = os.path.join(pwd, self.cf.get("COLORMAP", "StyleSetting"))
         style = style.strip()
         if style[0] != '&' and type(eval(style)) == dict:
             style = eval(style)
@@ -1375,7 +1390,7 @@ class Figure():
             sys.exit(0)
 
     def figures_inf(self):
-        self.figpath = "{}{}".format(self.cf.get('PLOT_CONFI', 'path'), self.cf.get('PLOT_CONFI', 'save_dir'))
+        self.figpath = os.path.abspath(os.path.join(self.cf.get('PLOT_CONFI', 'path'), self.cf.get('PLOT_CONFI', 'save_dir')))
         if not os.path.exists(self.figpath):
             os.makedirs(self.figpath)
         if self.cf.has_option('PLOT_CONFI', 'plot'):
@@ -1443,7 +1458,6 @@ class Figure():
                 self.data['abc**cba**bool**loob**alphabeta'] = bool_list
                 bo = bo + "& self.data['abc**cba**bool**loob**alphabeta']"
             fig['data'] = self.data[eval(bo)].reset_index()
-            print("Selected Data is -> {} rows".format(fig['data'].shape[0]))
 
 
 

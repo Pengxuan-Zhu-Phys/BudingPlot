@@ -1,3 +1,12 @@
+This project is suspended by Jarvis-PLOT 
+[https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT)
+[https://pypi.org/project/jarvisplot/](https://pypi.org/project/jarvisplot/)
+
+```bash
+pip install jarvisplot
+```
+
+
 # ![](src/image-src/BPicon.jpg)
 
 					By: 	Buding
